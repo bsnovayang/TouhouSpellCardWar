@@ -37,13 +37,39 @@
     startBattle(d, $('ai-hero').value, $('first-choice').value, lv);
   };
 
+  /* 雙人對戰：同一台電腦兩個分頁 */
+  function roomCode() {
+    var v = ($('room-code').value || '').trim().toUpperCase();
+    if (!v) { alert('請先輸入房間碼'); return null; }
+    return v;
+  }
+  $('btn-host').onclick = function () {
+    var room = roomCode(); if (!room) return;
+    var d = findDeck(chosenDeckId) || presetDecks()[0];
+    var errs = validateDeck(d);
+    if (errs.length) { alert('牌組不合法：' + errs.join(', ')); return; }
+    // 客人的牌組還沒傳過來，先用同一副開場；之後接伺服器時改成等客人送牌組
+    netAttach();
+    netHost(room, d, d);
+    showScreen('game');
+    netStatus('房間 ' + room + '：等待對手加入…');
+    showMulligan();
+  };
+  $('btn-join').onclick = function () {
+    var room = roomCode(); if (!room) return;
+    netAttach();
+    netJoin(room);
+    showScreen('game');
+    netStatus('房間 ' + room + '：連線中…');
+  };
+
   /* 對戰操作 */
   $('btn-end').onclick = onEndTurn;
   $('btn-quit').onclick = function () {
     if (!G || G.winner != null) return;
     if (!confirm('確定要投降嗎？')) return;
-    G.winner = 1 - G.humanSide;
-    G.phase = 'over';
+    dispatch({ k: 'concede' });
+    renderGame();
     showResult();
   };
   $('screen-game').addEventListener('click', function (e) {

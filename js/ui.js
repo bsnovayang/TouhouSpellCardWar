@@ -30,8 +30,17 @@ function showScreen(name) {
 var TYPE_NAME = { unit: '角色', spell: '符卡', ward: '結界', field: '場地', bgm: 'BGM' };
 var SRC_NAME = { 紅: '紅魔鄉', 妖: '妖妖夢', 永: '永夜抄', 通: '通用' };
 
+/* 遮蔽過的卡（defId '?'）畫成牌背而不是拋錯 ——
+   連線對戰時對手的手牌本來就不該有內容。 */
+function cardBackEl() {
+  var e = el('div', 'card back');
+  e.appendChild(el('div', 'nm', '？'));
+  return e;
+}
+
 function cardEl(defId, opt) {
   opt = opt || {};
+  if (!CARDS[defId]) return cardBackEl();
   var d = def(defId);
   var c = el('div', 'card t-' + d.type);
   // 專屬卡用英雄色的左側色條標記，跟中立卡一眼區分
@@ -171,7 +180,7 @@ function resumeBattle(s) {
   resetHpTracking();
   showScreen('game');
   if (G.phase === 'mulligan') showMulligan();
-  else { renderGame(); if (G.active === AI) setTimeout(aiStep, 500); }
+  else { renderGame(); if (NET.mode === 'local' && G.active === AI) setTimeout(aiStep, 500); }
 }
 
 /* ---------- 調度 ---------- */
@@ -195,12 +204,17 @@ function showMulligan() {
     var b = el('button', 'btn big primary', '確定');
     b.onclick = function () {
       var uids = Object.keys(toss).filter(function (k) { return toss[k]; }).map(Number);
-      doMulligan(G, ME, uids);
-      doMulligan(G, AI, aiMulligan(G, AI));
+      dispatch({ k: 'mull', toss: uids });
+      if (NET.mode === 'local') {
+        // 單機：對手是 AI，順手幫他調度
+        applyAction(G, AI, { k: 'mull', toss: aiMulligan(G, AI) });
+      }
       ov.hidden = true;
       renderGame();
-      saveGame(G);
-      if (G.active === AI) setTimeout(aiStep, 600);
+      if (NET.mode === 'local') saveGame(G);
+      if (NET.mode === 'local' && G.active === AI) setTimeout(aiStep, 600);
+      // 連線：另一邊還沒調度完的話，畫面會停在等待狀態，
+      // 由權威端推來的新盤面觸發重繪
     };
     inner.appendChild(b);
   }
@@ -221,7 +235,7 @@ function renderChoice() {
   c.options.forEach(function (defId) {
     var e = cardEl(defId, {});
     e.onclick = function () {
-      var err = resolveChoice(G, defId);
+      var err = dispatch({ k: 'choose', defId: defId });
       if (err) { toast(err); return; }
       ov.hidden = true;
       renderGame();
@@ -559,18 +573,19 @@ function onHeroPowerClick() {
   var err = canHeroPower(G, ME, null);
   if (err === 'NEED_TARGET') { sel = { mode: 'power' }; renderGame(); return; }
   if (err) { toast(err); return; }
-  useHeroPower(G, ME, null);
+  var e = dispatch({ k: 'power', t: null });
+  if (e) { toast(e); return; }
   afterAction();
 }
 
 function resolveSel(t) {
   if (sel.mode === 'card') doPlay(sel.uid, t);
-  else if (sel.mode === 'attack') { var e = doAttack(G, sel.uid, t); if (e) toast(e); sel = null; afterAction(); }
-  else if (sel.mode === 'power') { var e2 = useHeroPower(G, ME, t); if (e2) toast(e2); sel = null; afterAction(); }
+  else if (sel.mode === 'attack') { var e = dispatch({ k: 'atk', uid: sel.uid, t: t }); if (e) toast(e); sel = null; afterAction(); }
+  else if (sel.mode === 'power') { var e2 = dispatch({ k: 'power', t: t }); if (e2) toast(e2); sel = null; afterAction(); }
 }
 
 function doPlay(uid, t) {
-  var err = playCard(G, ME, uid, t);
+  var err = dispatch({ k: 'play', uid: uid, t: t });
   if (err) { toast(err); return; }
   sel = null;
   afterAction();
@@ -579,7 +594,9 @@ function doPlay(uid, t) {
 function afterAction() {
   sel = null;
   renderGame();
-  saveGame(G);
+  // 連線對戰不存本地檔 —— 那份是過期副本，重連時必須以權威端的盤面為準，
+  // 存了反而會讓玩家重整後「回到過去」，兩邊對不上。
+  if (NET.mode === 'local') saveGame(G);
   if (G.winner != null) showResult();
 }
 
@@ -591,11 +608,14 @@ function ensembleActive(u) {
 function onEndTurn() {
   if (!guard()) return;
   sel = null;
-  endTurn(G);
+  var err = dispatch({ k: 'end' });
+  if (err) { toast(err); return; }
   renderGame();
   saveGame(G);
   if (G.winner != null) { showResult(); return; }
-  if (G.active === AI) { busy = true; renderMid(); setTimeout(aiStep, SET.aiDelay); }
+  // 只有單機才叫 AI。連線對戰時對面是真人，而且本地的 G 是遮蔽過的視野 ——
+  // AI 在上面跑會讀到 '?' 的手牌直接爆掉。
+  if (NET.mode === 'local' && G.active === AI) { busy = true; renderMid(); setTimeout(aiStep, SET.aiDelay); }
 }
 
 function toast(msg) {
@@ -1245,4 +1265,33 @@ function renderRules() {
 function refreshMenu() {
   var g = lsGet(K.game, null);
   $('btn-resume').hidden = !g;
+}
+
+
+/* ============================================================
+   連線對戰的介面接線
+   ============================================================ */
+
+/* 權威端推來新盤面時，整個換掉並重繪。
+   注意 G 會被整包取代 —— 客人端從不自己修改盤面，
+   所以不會有「本地改了一半又被覆蓋」的閃爍問題。 */
+function netAttach() {
+  NET.onState = function (s) {
+    G = s;
+    ME = NET.side; AI = 1 - NET.side;
+    busy = (G.active !== ME);
+    if (G.phase === 'mulligan' && G.pendingMulligan[ME]) showMulligan();
+    else { $('overlay').hidden = true; renderGame(); }
+    if (G.winner != null) showResult();
+    netStatus(G.active === ME ? '你的回合' : '等待對手…');
+  };
+  NET.onInfo = function (kind, msg) {
+    netStatus(msg);
+    if (kind === 'left') toast('對手離開了');
+  };
+}
+
+function netStatus(msg) {
+  var n = $('net-status');
+  if (n) n.textContent = msg || '';
 }

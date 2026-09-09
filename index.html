@@ -53,6 +53,15 @@
       </label>
     </div>
     <button class="btn big primary" id="btn-start">對戰開始</button>
+
+    <h3 class="sect">雙人對戰（同一台電腦開兩個分頁即可測試）</h3>
+    <p class="hintline">目前是同裝置連線（BroadcastChannel），換裝置需要伺服器。房間碼兩邊要一樣。</p>
+    <div class="row-inline">
+      <label>房間碼 <input id="room-code" placeholder="例如 AB12" maxlength="8"></label>
+      <button class="btn" id="btn-host">開房（我先手方）</button>
+      <button class="btn" id="btn-join">加入房間</button>
+    </div>
+    <div id="net-status" class="hintline"></div>
   </div>
 </section>
 
@@ -181,6 +190,7 @@
 <script src="js/cards/in.js"></script>
 <script src="js/decks.js"></script>
 <script src="js/ai.js"></script>
+<script src="js/net.js"></script>
 <script src="js/storage.js"></script>
 <script src="js/ui.js"></script>
 <script src="js/main.js"></script>

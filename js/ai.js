@@ -113,11 +113,30 @@ function enumActions(s, pi) {
   return acts;
 }
 
+/* 玩家在一個回合裡能做的所有事，全部走這一個入口。
+   連線對戰時傳輸的就是這種物件（約 51 bytes），
+   所以「結束回合」與「投降」也必須是動作，不能是另外呼叫的函式。 */
 function applyAction(s, pi, a) {
   if (a.k === 'choose') return resolveChoice(s, a.defId);
   if (a.k === 'play') return playCard(s, pi, a.uid, a.t);
   if (a.k === 'power') return useHeroPower(s, pi, a.t);
   if (a.k === 'atk') return doAttack(s, a.uid, a.t);
+  if (a.k === 'end') {
+    if (s.active !== pi) return '不是你的回合';
+    return endTurn(s) || null;
+  }
+  if (a.k === 'mull') {
+    if (!s.pendingMulligan[pi]) return '你已經調度過了';
+    doMulligan(s, pi, a.toss || []);
+    return null;
+  }
+  if (a.k === 'concede') {
+    if (s.winner != null) return '對局已結束';
+    s.winner = foe(pi);
+    s.phase = 'over';
+    logMsg(s, heroName(s.players[pi]) + ' 投降');
+    return null;
+  }
   return '未知動作';
 }
 

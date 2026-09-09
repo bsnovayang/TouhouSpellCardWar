@@ -1,0 +1,111 @@
+const puppeteer = require('puppeteer-core');
+const wait = ms => new Promise(r => setTimeout(r, ms));
+const URL = 'http://localhost:8899/index.html';
+
+(async () => {
+  // BroadcastChannel 需要同源，file:// 每個分頁是不同 origin，所以起一個本地伺服器
+  const http = require('http'), fs = require('fs'), path = require('path');
+  const ROOT = require('path').join(__dirname, '..');
+  const MIME = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css' };
+  const srv = http.createServer((req, res) => {
+    const f = path.join(ROOT, decodeURIComponent(req.url.split('?')[0]));
+    fs.readFile(f, (e, d) => {
+      if (e) { res.writeHead(404); res.end(); return; }
+      res.writeHead(200, { 'Content-Type': MIME[path.extname(f)] || 'text/plain' });
+      res.end(d);
+    });
+  }).listen(8899);
+
+  const b = await puppeteer.launch({
+    executablePath: 'C:/Program Files/Google/Chrome/Application/chrome.exe',
+    headless: 'new', args: ['--no-sandbox'], protocolTimeout: 15000
+  });
+  const errs = [];
+  const mk = async name => {
+    const p = await b.newPage();
+    await p.setViewport({ width: 1400, height: 900 });
+    p.on('pageerror', e => { errs.push(name + ': ' + e.message); console.log('  ⚠ ' + name + ' 頁面錯誤：' + e.message.slice(0,120)); });
+    await p.goto(URL, { waitUntil: 'networkidle0' });
+    await wait(300);
+    return p;
+  };
+
+  const A = await mk('主機'), B = await mk('客人');
+  const step = m => console.log('  … ' + m);
+  // 背景分頁的 compositor 會被 Chrome 節流，page.click 需要它做 scrollIntoView。
+  // 這是測試環境的限制，不是遊戲的問題。
+  const click = async (p, sel) => { await p.bringToFront(); await p.click(sel); };
+
+  // 兩邊都到牌組選擇畫面
+  step('點 開始對戰');
+  for (const p of [A, B]) { await click(p, '#btn-play'); await wait(250); }
+  step('畫面：' + await A.evaluate(() => document.querySelector('.screen.active').id));
+  await A.evaluate(() => { document.getElementById('room-code').value = 'TEST'; });
+  await B.evaluate(() => { document.getElementById('room-code').value = 'TEST'; });
+
+  step('主機開房');
+  await click(A, '#btn-host'); await wait(500);
+  step('主機畫面：' + await A.evaluate(() => document.querySelector('.screen.active').id) +
+    '　overlay=' + await A.evaluate(() => document.getElementById('overlay').hidden));
+  step('客人加入');
+  await click(B, '#btn-join'); await wait(800);
+  step('客人 G=' + await B.evaluate(() => G ? G.phase : 'null'));
+
+  const snap = async (p, who) => p.evaluate(w => ({
+    who: w, mode: NET.mode, side: NET.side,
+    phase: G ? G.phase : null, active: G ? G.active : null,
+    myHand: G ? G.players[NET.side].hand.map(c => c.defId).slice(0, 3) : null,
+    foeHand: G ? G.players[1 - NET.side].hand.map(c => c.defId) : null,
+    status: (document.getElementById('net-status') || {}).textContent
+  }), who);
+
+  console.log('=== 開房／加入後 ===');
+  console.log(' ', JSON.stringify(await snap(A, '主機')));
+  console.log(' ', JSON.stringify(await snap(B, '客人')));
+
+  // 兩邊各自完成調度
+  for (const [p, who] of [[A, '主機'], [B, '客人']]) {
+    const has = await p.evaluate(() => !document.getElementById('overlay').hidden);
+    const inner = await p.evaluate(() => {
+      const o = document.getElementById('overlay-inner');
+      return { html: o.innerHTML.length, btns: o.querySelectorAll('button').length };
+    });
+    console.log(who + ' overlay 顯示=' + has + '　inner 內容長度=' + inner.html + '　按鈕數=' + inner.btns);
+    if (has && inner.btns) { await click(p, '#overlay-inner button'); await wait(400); }
+    console.log(who + ' 調度完成，overlay hidden = ' + await p.evaluate(() => document.getElementById('overlay').hidden));
+  }
+  await wait(600);
+
+  console.log('\n=== 調度後 ===');
+  const a2 = await snap(A, '主機'), b2 = await snap(B, '客人');
+  console.log(' ', JSON.stringify(a2));
+  console.log(' ', JSON.stringify(b2));
+  console.log('  主機看到的對手手牌是否全被遮蔽：' + (b2.foeHand ? '' : '-') +
+    (a2.foeHand ? a2.foeHand.every(x => x === '?') : '-'));
+  console.log('  客人看到的對手手牌是否全被遮蔽：' + (b2.foeHand ? b2.foeHand.every(x => x === '?') : '-'));
+
+  console.log('\n=== 由當前行動方結束回合，看另一邊會不會同步 ===');
+  const actor = a2.active === a2.side ? A : B;
+  const other = actor === A ? B : A;
+  const before = await other.evaluate(() => G.active);
+  await click(actor, '#btn-end'); await wait(700);
+  const after = await other.evaluate(() => G.active);
+  console.log('  另一邊的 active：' + before + ' → ' + after + (before !== after ? '　✓ 有同步' : '　✗ 沒同步'));
+
+    /* 斷言 —— 沒有這一段的話這支測試只會印字，不會擋下任何回歸 */
+  const fail = [];
+  if (a2.myHand.some(x => x === '?')) fail.push('主機看不到自己的手牌');
+  if (b2.myHand.some(x => x === '?')) fail.push('客人看不到自己的手牌');
+  if (!a2.foeHand.every(x => x === '?')) fail.push('主機看得到對手手牌 —— 遮蔽失效');
+  if (!b2.foeHand.every(x => x === '?')) fail.push('客人看得到對手手牌 —— 遮蔽失效');
+  if (a2.myHand.join() === b2.myHand.join()) fail.push('雙方手牌一模一樣 —— 沒有真的分成兩個玩家');
+  if (a2.phase !== 'play' || b2.phase !== 'play') fail.push('雙方調度後沒有進入對局');
+  if (before === after) fail.push('結束回合沒有同步到另一端');
+  errs.forEach(e => fail.push(e));
+  const NL = String.fromCharCode(10);
+  console.log(fail.length
+    ? NL + '--- 雙人連線測試失敗 ---' + NL + '  ' + fail.join(NL + '  ')
+    : NL + '雙人連線測試通過 ✓');
+  await b.close(); srv.close();
+  process.exit(fail.length ? 1 : 0);
+})();

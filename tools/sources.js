@@ -5,7 +5,7 @@ const ROOT = path.join(__dirname, '..');
 const FILES = [
   'js/config.js', 'js/engine.js', 'js/carddb.js', 'js/keywords.js', 'js/heroes.js',
   'js/cards/common.js', 'js/cards/eosd.js', 'js/cards/pcb.js', 'js/cards/in.js',
-  'js/decks.js', 'js/ai.js'
+  'js/decks.js', 'js/ai.js', 'js/net.js'
 ];
 
 function loadGame() {

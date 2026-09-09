@@ -62,6 +62,10 @@ function makePlayer(pi, heroId, decklist, bgmId) {
 }
 
 function newGame(cfg) {
+  // uid 計數器每一局重來。它原本是模組層全域、跨局累加，
+  // 所以同一個種子在不同客戶端會配出不同的 uid ——
+  // 而動作訊息正是靠 uid 指定目標，連線對戰會因此對不上。
+  _uid = 1;
   var s = {
     seed: cfg.seed || (Math.random() * 1e9) | 0,
     turn: 0,
