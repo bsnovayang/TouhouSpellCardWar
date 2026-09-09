@@ -161,6 +161,7 @@ export class Match {
         return;
       }
       this.decks[side] = msg.deck;
+      this.send(1 - side, { t: 'peer', gone: false });   // 對手（重新）連上了
       // 兩邊的牌組都到齊才開局 —— 在知道對手帶什麼之前不能建立盤面
       if (this.decks[0] && this.decks[1] && !this.full) {
         this.full = newGame({
@@ -189,7 +190,14 @@ export class Match {
   }
 
   async webSocketClose(ws) {
-    // 不在這裡判輸 —— 分不出「重新整理」和「不玩了」，交給 alarm 的寬限期
+    // 不在這裡判輸 —— 分不出「重新整理」和「不玩了」，交給 alarm 的寬限期。
+    // 但一定要告訴另一邊，否則他會對著「你的回合」乾等一分鐘，
+    // 完全不知道對手已經走了（客戶端的心跳量的是與伺服器的連線，不是對手在不在）。
+    const side = this.sideOf(ws);
+    if (side >= 0) {
+      this.lastSeen[side] = Date.now();
+      this.send(1 - side, { t: 'peer', gone: true, until: Date.now() + DISCONNECT_GRACE * 1000 });
+    }
     this.state.storage.setAlarm(Date.now() + 5000);
   }
 

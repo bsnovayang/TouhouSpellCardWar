@@ -27,7 +27,8 @@ var NET = {
   onState: null,     // 收到新盤面時要做什麼（由 ui.js 掛上）
   onInfo: null,      // 連線狀態變化（等待對手／對手斷線／對手離開）
   onTick: null,      // 每 250ms 回報剩餘秒數
-  onTimeout: null    // 單機模式時間到（由 ui 決定怎麼結束回合）
+  onTimeout: null,   // 單機模式時間到（由 ui 決定怎麼結束回合）
+  peerGoneUntil: 0   // 伺服器告知對手斷線的判定時限
 };
 
 /* ---------- 遮蔽視野 ----------
@@ -140,6 +141,14 @@ function hostStart(guestDeck) {
 function guestOnMessage(msg) {
   aliveSeen();
   if (msg.t === 'ping') return;
+  if (msg.t === 'peer') {
+    // 伺服器模式下，本地心跳量的是「與伺服器的連線」，察覺不到對手離開，
+    // 所以對手在不在必須由伺服器告知。
+    NET.peerGoneUntil = msg.gone ? (msg.until || 0) : 0;
+    if (NET.onInfo) NET.onInfo(msg.gone ? 'lost' : 'back',
+      msg.gone ? '對手斷線中…' : '對手回來了');
+    return;
+  }
   if (msg.t === 'full' || msg.t === 'reject') {
     if (NET.onInfo) NET.onInfo('reject', msg.m);
     return;
@@ -183,7 +192,7 @@ function localChannel(room, onMessage) {
    跨裝置時伺服器才是權威端，兩邊都是 guest —— 沒有人在瀏覽器裡跑引擎，
    所以對手的手牌真的離不開伺服器。同裝置的 BroadcastChannel 模式
    則是主機端跑引擎，那個只用來在沒有後端時驗證流程。 */
-var SERVER_URL = '';   // 例如 'wss://tsw.你的帳號.workers.dev'，空字串代表沒有設定伺服器
+var SERVER_URL = 'wss://tsw.touhouspellcardwar.workers.dev';   // 空字串代表沒有設定伺服器
 
 function wsChannel(room, onMessage, onOpen) {
   var ws = new WebSocket(SERVER_URL + '/ws/' + room);
@@ -376,6 +385,13 @@ function aliveSeen() {
 function aliveTick() {
   if (NET.mode === 'local' || !NET.transport) return;
   NET.transport.send({ t: 'ping' });
+
+  // 伺服器告知的「對手斷線中」倒數
+  if (NET.peerGoneUntil) {
+    var s2 = Math.max(0, Math.ceil((NET.peerGoneUntil - Date.now()) / 1000));
+    if (NET.onInfo) NET.onInfo('waiting', '對手斷線中…（' + s2 + ' 秒後判定）');
+    if (s2 === 0) NET.peerGoneUntil = 0;
+  }
 
   var gone = (Date.now() - ALIVE.lastSeen) / 1000;
   if (gone < 3) return;                       // 還在正常心跳範圍

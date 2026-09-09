@@ -1297,7 +1297,11 @@ function netAttach() {
     busy = (G.active !== ME);
     if (G.phase === 'mulligan' && G.pendingMulligan[ME]) showMulligan();
     else { $('overlay').hidden = true; renderGame(); }
-    if (G.winner != null) showResult();
+    if (G.winner != null) {
+      showResult();
+      netStatus(G.winner === ME ? '你獲勝' : '你落敗');
+      return;
+    }
     netStatus(G.active === ME ? '你的回合' : '等待對手…');
   };
   NET.onInfo = function (kind, msg) {
