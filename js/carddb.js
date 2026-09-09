@@ -41,7 +41,7 @@ var CARD_PROBLEMS = [];
 var CARD_FIELDS = {
   id: 1, name: 1, text: 1, cost: 1, type: 1, cls: 1, src: 1, set: 1, atk: 1, hp: 1,
   kw: 1, tribe: 1, works: 1, token: 1, unique: 1, pair: 1, target: 1, barrier: 1,
-  tutor: 1, playable: 1, spellDmg: 1,
+  tutor: 1, playable: 1, spellDmg: 1, nandai: 1,
   onPlay: 1, onDeath: 1, onTurnStart: 1, onTurnEnd: 1, onDamaged: 1, onAllySpell: 1,
   onAllyDeath: 1, onAllySummon: 1, onHeroHurt: 1, onExtraAttack: 1,
   aura: 1, unitAura: 1, selfAura: 1, costMod: 1, dmgReduce: 1, grantKw: 1

@@ -270,6 +270,61 @@ console.log('人妖組（官方四組）');
   check('「人妖組」有進關鍵字辭典', !!g.KEYWORDS['人妖組'], true);
 }
 
+/* ---------- 反魂：永琳的藥 ---------- */
+console.log('反魂');
+{
+  const A = u => g.atkOf(u) + '/' + g.hpOf(u);
+  let s = fresh();
+  let u = g.summon(s, 0, 'n_meiling', {}); u.revive = 1; g.recalc(s);
+  g.dmgUnit(s, u, 99); g.cleanupDeaths(s); g.recalc(s);
+  check('致命傷後以 1 生命回到場上', A(u), '2/1');
+  check('　　　　　　　→ 沒進墓地', s.players[0].grave.length, 0);
+  g.dmgUnit(s, u, 99); g.cleanupDeaths(s);
+  check('反魂用完後真的死去', g.unitsOf(s, 0).length, 0);
+  check('　　　　　　　→ 這次進墓地', s.players[0].grave.length, 1);
+
+  // 神隱優先於反魂 —— 除外本來就該是所有復活手段的硬解
+  s = fresh();
+  u = g.summon(s, 0, 'n_meiling', {}); u.revive = 1; g.recalc(s);
+  g.banishUnit(s, u); g.cleanupDeaths(s);
+  check('被神隱時反魂救不回來', g.unitsOf(s, 0).length, 0);
+
+  // 封印會讓反魂失效（卡面文字全部失效）
+  s = fresh();
+  u = g.summon(s, 0, 'n_meiling', {}); u.revive = 1; g.silence(s, u); g.recalc(s);
+  g.dmgUnit(s, u, 99); g.cleanupDeaths(s);
+  check('封印後反魂也失效', g.unitsOf(s, 0).length, 0);
+}
+
+/* ---------- 強制交戰：鈴仙的狂氣 ---------- */
+console.log('強制交戰');
+{
+  const s = fresh();
+  const a = g.summon(s, 1, 'n_ran', {});      // 4/4
+  const b = g.summon(s, 1, 'n_chen', {});     // 3/1
+  g.recalc(s);
+  const myHp = s.players[0].hp;
+  g.forceClash(s, a, b);
+  g.cleanupDeaths(s); g.recalc(s);
+  check('橙被 4 點打死', g.unitsOf(s, 1).length, 1);
+  check('藍也吃了 3 點反傷', g.hpOf(a), 1);
+  check('我方英雄完全沒受影響', s.players[0].hp, myHp);
+}
+
+/* ---------- 條件式探尋：因幡帝的幸運 ---------- */
+console.log('條件式探尋');
+{
+  const s = fresh();
+  s.autoResolveChoice = false;
+  g.discoverWhere(s, 0, d => d.cost <= 2 && d.type !== 'bgm', 3, '測試',
+    (s2, pi, card) => { card.costMod -= 99; });
+  const opts = s.pendingChoice.options;
+  check('選項都符合條件（費用 ≤ 2）', opts.every(i => g.CARDS[i].cost <= 2), true);
+  g.resolveChoice(s, opts[0]);
+  const got = s.players[0].hand[s.players[0].hand.length - 1];
+  check('取得的卡被加工成 0 費', g.costOf(s, 0, got), 0);
+}
+
 /* ---------- 用詞一致性 ---------- */
 console.log('用詞');
 {

@@ -390,3 +390,77 @@ HEROES.mystia = {
 };
 
 HERO_ORDER.push('keine', 'wriggle', 'mystia');
+
+
+/* ============================================================
+   東方永夜抄 — 第三階段（需要新引擎能力的四位）
+   ============================================================ */
+
+/* 永琳：藥師。給角色一次「死不了」，對手的移除就得多花一次。 */
+HEROES.eirin = {
+  id: 'eirin', set: '永', name: '八意永琳', title: '月之頭腦', hp: 30, color: '#c8b8e0',
+  power: '藥師', powerText: '我方一個角色獲得反魂（死去時改為以 1 生命回到場上）',
+  target: T.aUnit,
+  use: function (s, c) {
+    var u = c.target && c.target.unit; if (!u) return;
+    u.revive = (u.revive || 0) + 1;
+    logMsg(s, '「' + def(u.defId).name + '」獲得反魂');
+  },
+  profile: { hp: 30, special: 'grant_revive' }
+};
+
+/* 鈴仙：狂氣。不自己出手，讓對手的角色互相殘殺 ——
+   對手場面愈大，她的技能愈痛，這是全場唯一「對手鋪場反而危險」的能力。 */
+HEROES.reisen = {
+  id: 'reisen', set: '永', name: '鈴仙·優曇華院·因幡', title: '狂氣的月兔', hp: 30,
+  // 靈 3 時她 70%：每回合一次「逼兩個敵人互相殘殺」等於可重複的雙向移除。
+  color: '#b088c8', cost: 4,
+  power: '狂氣', powerText: '使一個敵方角色攻擊另一個隨機的敵方角色',
+  target: T.eUnit,
+  use: function (s, c) {
+    var a = c.target && c.target.unit; if (!a) return;
+    var others = unitsOf(s, foe(c.pi)).filter(function (x) { return x !== a; });
+    var b = pick(s, others);
+    if (!b) { logMsg(s, '對方只有一個角色，狂氣沒有對象'); return; }
+    forceClash(s, a, b);
+  },
+  profile: { hp: 30, special: 'force_clash' }
+};
+
+/* 因幡帝：幸運。探尋一張便宜的卡並讓它免費 ——
+   跟騷靈三姊妹的探尋差別在：她們是「找特定族群」，帝是「把找到的變成 0 費」。 */
+HEROES.tewi = {
+  id: 'tewi', set: '永', name: '因幡帝', title: '幸運的白兔', hp: 28, color: '#e8c8d0',
+  power: '幸運', powerText: '探尋(3)：從費用 2 以下的卡中選 1 張，其費用變為 0',
+  use: function (s, c) {
+    discoverWhere(s, c.pi,
+      function (d) { return d.cost <= 2 && d.type !== 'bgm'; },
+      3, '探尋「幸運」',
+      function (s2, pi, card) { card.costMod -= 99; });
+  },
+  profile: { hp: 28, draw: 1, special: 'discover_free' }
+};
+
+/* 輝夜：五個難題。技能把難題洗進手裡，難題本身是她的五張專屬大招。 */
+HEROES.kaguya = {
+  id: 'kaguya', set: '永', name: '蓬萊山輝夜', title: '永遠與須臾', hp: 30,
+  // 靈 3 時她 70%：每回合白拿一張 4～7 費的大招，價值在「拿得到」而不是折扣，
+  // 所以先前把折扣從 -2 改成 -1 完全沒有效果，得直接讓她少按幾次。
+  color: '#d0a8d8', cost: 4,
+  // 每回合白拿一張大招已經很強，折扣再給 -2 就過頭了。
+  // BGM「竹取飛翔」另外還會 -1，兩者疊起來才回到 -2。
+  power: '五個難題', powerText: '隨機獲得一張「難題」，其費用 -1',
+  use: function (s, c) {
+    var pool = Object.keys(CARDS).filter(function (id) { return CARDS[id].nandai; });
+    var id = pick(s, pool);
+    var p = s.players[c.pi];
+    if (!id || p.hand.length >= HAND_MAX) { logMsg(s, '手牌已滿'); return; }
+    var card = makeCard(id);
+    card.costMod -= 1;
+    p.hand.push(card);
+    logMsg(s, '出了難題「' + CARDS[id].name + '」（費用 -1）');
+  },
+  profile: { hp: 30, special: 'generate_nandai' }
+};
+
+HERO_ORDER.push('eirin', 'reisen', 'tewi', 'kaguya');

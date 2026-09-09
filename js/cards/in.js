@@ -417,3 +417,287 @@ C({
   text: '發動：從牌庫檢索「米斯蒂婭·蘿蕾拉」。敵方角色 -1 攻擊力。',
   aura: function (s, owner, u) { return (u.owner !== owner) ? [-1, 0] : null; }
 });
+
+/* ========== 八意永琳：藥與反魂 ==========
+   技能給角色一次「死不了」，對手的移除就得多花一次。
+   她的卡把這件事推到極致：疊反魂、回血、把死亡當成資源。 */
+
+C({
+  id: 'ei_medicine', name: '藥符「壺中之藥」', src: '永', cls: 'eirin', type: 'spell', cost: 3,
+  text: '我方一個角色獲得反魂，並回復所有生命。', target: T.aUnit,
+  onPlay: function (s, c) {
+    var u = c.target && c.target.unit; if (!u) return;
+    u.revive = (u.revive || 0) + 1;
+    u.dmg = 0;
+  }
+});
+
+C({
+  id: 'ei_hourai', name: '藥符「蓬萊之藥」', src: '永', cls: 'eirin', type: 'spell', cost: 6,
+  text: '我方所有角色獲得反魂。',
+  onPlay: function (s, c) {
+    unitsOf(s, c.pi).forEach(function (u) { u.revive = (u.revive || 0) + 1; });
+  }
+});
+
+C({
+  id: 'ei_astro', name: '天文「天鵝座 α」', src: '永', cls: 'eirin', type: 'spell', cost: 4,
+  text: '對所有敵方角色造成 2 點傷害，我方英雄回復 4 點。',
+  onPlay: function (s, c) {
+    unitsOf(s, foe(c.pi)).forEach(function (u) { dmgUnit(s, u, 2); });
+    healHero(s, c.pi, 4);
+  }
+});
+
+C({
+  id: 'ei_mixture', name: '難題「新蓬萊之藥」', src: '永', cls: 'eirin', type: 'spell', cost: 2,
+  text: '我方英雄回復 6 點；若我方有帶反魂的角色，改為回復 10 點。',
+  onPlay: function (s, c) {
+    var boost = unitsOf(s, c.pi).some(function (u) { return (u.revive || 0) > 0; });
+    if (boost) logMsg(s, '藥效倍增');
+    healHero(s, c.pi, boost ? 10 : 6);
+  }
+});
+
+C({
+  id: 'ei_usagi', tribe: ['月人'], name: '月之藥師', src: '永', cls: 'eirin', type: 'unit',
+  cost: 4, atk: 3, hp: 4, works: ['永'],
+  text: '登場：我方一個其他角色獲得反魂。', target: T.aUnit,
+  onPlay: function (s, c) {
+    var u = c.target && c.target.unit;
+    if (u && u !== c.self) u.revive = (u.revive || 0) + 1;
+  }
+});
+
+C({
+  id: 'ei_moonrabbit', tribe: ['月人'], name: '月兔', src: '永', cls: 'eirin', type: 'unit',
+  cost: 2, atk: 2, hp: 2, works: ['永'],
+  text: '死去：我方英雄回復 3 點。',
+  onDeath: function (s, pi, u) { healHero(s, pi, 3); }
+});
+
+C({
+  id: 'bgm_eirin', name: 'ヴォヤージュ1970', src: '永', cls: 'neutral', type: 'bgm',
+  cost: 3, unique: true, tutor: 'n_eirin',
+  text: '發動：從牌庫檢索「八意永琳」。我方「月人」角色 +1/+1。',
+  aura: function (s, owner, u) {
+    return (u.owner === owner && hasTribe(def(u.defId), '月人')) ? [1, 1] : null;
+  }
+});
+
+
+/* ========== 鈴仙·優曇華院·因幡：狂氣 ==========
+   她不自己出手，讓對手的角色互相殘殺。
+   對手鋪得愈滿她愈強 —— 全場唯一「對手鋪場反而危險」的流派。 */
+
+C({
+  id: 're_lunatic', name: '狂符「幻視盲聽」', src: '永', cls: 'reisen', type: 'spell', cost: 4,
+  text: '使兩個隨機的敵方角色互相攻擊。',
+  onPlay: function (s, c) {
+    var list = unitsOf(s, foe(c.pi));
+    if (list.length < 2) { logMsg(s, '對方角色不足兩個'); return; }
+    var a = pick(s, list);
+    var b = pick(s, list.filter(function (x) { return x !== a; }));
+    forceClash(s, a, b);
+  }
+});
+
+C({
+  id: 're_discarder', name: '狂視「Illusion Seeker」', src: '永', cls: 'reisen', type: 'spell', cost: 5,
+  text: '使一個敵方角色攻擊所有其他敵方角色。', target: T.eUnit,
+  onPlay: function (s, c) {
+    var a = c.target && c.target.unit; if (!a) return;
+    unitsOf(s, foe(c.pi)).slice().forEach(function (b) {
+      if (b !== a && !a.dead) forceClash(s, a, b);
+    });
+  }
+});
+
+C({
+  id: 're_wave', name: '波符「幻朧月睨」', src: '永', cls: 'reisen', type: 'spell', cost: 3,
+  text: '所有敵方角色的攻擊力 -2。',
+  onPlay: function (s, c) {
+    unitsOf(s, foe(c.pi)).forEach(function (u) { buffUnit(u, -2, 0); });
+  }
+});
+
+C({
+  id: 're_madness', tribe: ['月人'], name: '狂氣的月兔', src: '永', cls: 'reisen', type: 'unit',
+  cost: 3, atk: 3, hp: 3, works: ['永'],
+  text: '登場：敵方角色每有 3 個，對敵方英雄造成 2 點傷害。',
+  onPlay: function (s, c) {
+    var n = Math.floor(unitsOf(s, foe(c.pi)).length / 3) * 2;
+    if (n > 0) { logMsg(s, '對方場面擁擠 — 對英雄 ' + n + ' 點傷害'); dmgHero(s, foe(c.pi), n); }
+  }
+});
+
+C({
+  id: 're_eye', tribe: ['月人'], name: '紅色的眼', src: '永', cls: 'reisen', type: 'unit',
+  cost: 2, atk: 1, hp: 4, works: ['永'],
+  text: '登場：一個敵方角色本回合無法攻擊。', target: T.eUnit,
+  onPlay: function (s, c) { if (c.target && c.target.unit) c.target.unit.cantAttack = true; }
+});
+
+C({
+  id: 're_wd_kyouki', name: '狂氣之波', src: '永', cls: 'reisen', type: 'ward', cost: 4,
+  text: '你的回合開始時，若敵方角色有 3 個以上，使兩個隨機的敵方角色互相攻擊。',
+  onTurnStart: function (s, owner) {
+    var list = unitsOf(s, foe(owner));
+    if (list.length < 3) return;
+    var a = pick(s, list);
+    var b = pick(s, list.filter(function (x) { return x !== a; }));
+    forceClash(s, a, b);
+  }
+});
+
+C({
+  id: 'bgm_reisen', name: '狂気の瞳 ～ Invisible Full Moon', src: '永', cls: 'neutral', type: 'bgm',
+  cost: 3, unique: true, tutor: 'n_reisen',
+  text: '發動：從牌庫檢索「鈴仙·優曇華院·因幡」。敵方角色 -1 攻擊力。',
+  aura: function (s, owner, u) { return (u.owner !== owner) ? [-1, 0] : null; }
+});
+
+
+/* ========== 因幡帝：幸運 ==========
+   技能把便宜的卡變成免費。她的卡走同一條路：
+   讓費用消失、讓小卡變大，靠「白賺的那一點」累積成優勢。 */
+
+C({
+  id: 'te_luck', name: '兔符「因幡的素兔」', src: '永', cls: 'tewi', type: 'spell', cost: 2,
+  text: '抽 2 張，它們的費用各 -1。',
+  onPlay: function (s, c) {
+    var p = s.players[c.pi];
+    var before = p.hand.length;
+    draw(s, c.pi, 2);
+    for (var i = before; i < p.hand.length; i++) p.hand[i].costMod -= 1;
+  }
+});
+
+C({
+  id: 'te_fortune', name: '幸運的加護', src: '永', cls: 'tewi', type: 'spell', cost: 1,
+  text: '我方一個角色 +2/+2。', target: T.aUnit,
+  onPlay: function (s, c) { if (c.target && c.target.unit) buffUnit(c.target.unit, 2, 2); }
+});
+
+C({
+  id: 'te_trap', name: '罠符「Ultimate Buried」', src: '永', cls: 'tewi', type: 'spell', cost: 3,
+  text: '對一個敵方角色造成 5 點傷害。', target: T.eUnit,
+  onPlay: function (s, c) { if (c.target && c.target.unit) dmgUnit(s, c.target.unit, 5); }
+});
+
+C({
+  id: 'te_rabbit', tribe: ['妖怪'], name: '因幡的兔', src: '永', cls: 'tewi', type: 'unit',
+  cost: 1, atk: 1, hp: 2, works: ['永'],
+  text: '登場：手牌中隨機一張卡費用 -1。',
+  onPlay: function (s, c) {
+    var t = pick(s, s.players[c.pi].hand);
+    if (t) { t.costMod -= 1; logMsg(s, '「' + def(t.defId).name + '」費用 -1'); }
+  }
+});
+
+C({
+  id: 'te_lucky', tribe: ['妖怪'], name: '幸運的兔', src: '永', cls: 'tewi', type: 'unit',
+  cost: 3, atk: 3, hp: 3, works: ['永'],
+  text: '登場：探尋(3)：從費用 2 以下的卡中選 1 張，其費用變為 0。',
+  onPlay: function (s, c) {
+    discoverWhere(s, c.pi,
+      function (d) { return d.cost <= 2 && d.type !== 'bgm'; },
+      3, '探尋「幸運」',
+      function (s2, pi, card) { card.costMod -= 99; });
+  }
+});
+
+C({
+  id: 'te_wd_kouun', name: '幸運之兆', src: '永', cls: 'tewi', type: 'ward', cost: 3,
+  text: '你的回合開始時，手牌中隨機一張卡費用 -1。',
+  onTurnStart: function (s, owner) {
+    var t = pick(s, s.players[owner].hand);
+    if (t) t.costMod -= 1;
+  }
+});
+
+C({
+  id: 'bgm_tewi', name: 'お宇佐さまの素い幡', src: '永', cls: 'neutral', type: 'bgm',
+  cost: 3, unique: true, tutor: 'n_tewi',
+  text: '發動：從牌庫檢索「因幡帝」。你的回合開始時，手牌最右的卡費用 -1。',
+  onTurnStart: function (s, owner) {
+    var h = s.players[owner].hand;
+    if (h.length) h[h.length - 1].costMod -= 1;
+  }
+});
+
+
+/* ========== 蓬萊山輝夜：五個難題 ==========
+   技能每回合把一個難題洗進手裡（費用 -2）。
+   難題本身就是她的五張專屬大招 —— 各自對應原作那五樣不可能的寶物，
+   單張都比同費強，但你抽到哪一個由不得你。 */
+
+C({
+  id: 'ka_hourai', name: '難題「蓬萊的玉枝 -永夜的雕刻家-」', src: '永', cls: 'kaguya',
+  // 全體 +2/+2 且沒有族群限制 —— 大妖精的「妖精的成長」3 費只給妖精 +1/+1
+  type: 'spell', cost: 7, nandai: true,
+  text: '我方所有角色 +2/+2。',
+  onPlay: function (s, c) {
+    unitsOf(s, c.pi).forEach(function (u) { buffUnit(u, 2, 2); });
+  }
+});
+
+C({
+  id: 'ka_hachi', name: '難題「佛之石缽 -不碎的意志-」', src: '永', cls: 'kaguya',
+  // 慧音的「アマテラス」6 費才給「+1/+1 ＋一層護盾」，這張原本 5 費就給兩層護盾
+  type: 'spell', cost: 6, nandai: true,
+  text: '我方所有角色各獲得兩層森羅結界。',
+  onPlay: function (s, c) {
+    unitsOf(s, c.pi).forEach(function (u) { addBarrier(s, u, 2); });
+  }
+});
+
+C({
+  id: 'ka_koromo', name: '難題「火鼠的皮衣 -燒不盡的心-」', src: '永', cls: 'kaguya',
+  type: 'spell', cost: 4, nandai: true,
+  text: '我方英雄回復 8 點，並抽 1 張。',
+  onPlay: function (s, c) { healHero(s, c.pi, 8); draw(s, c.pi, 1); }
+});
+
+C({
+  id: 'ka_tama', name: '難題「龍頸之玉 -五色的彈丸-」', src: '永', cls: 'kaguya',
+  // 魔理沙的「ドラゴンメテオ」6 費打 4 次，這張原本 5 費就打 5 次
+  type: 'spell', cost: 6, nandai: true,
+  text: '對隨機的敵方目標造成 2 點傷害 5 次。',
+  onPlay: function (s, c) {
+    for (var i = 0; i < 5; i++) {
+      var t = pick(s, unitsOf(s, foe(c.pi)));
+      if (t) dmgUnit(s, t, 2); else dmgHero(s, foe(c.pi), 2);
+      cleanupDeaths(s);
+    }
+  }
+});
+
+C({
+  id: 'ka_kai', name: '難題「燕的子安貝 -永遠的乳白色-」', src: '永', cls: 'kaguya',
+  type: 'spell', cost: 7, nandai: true,
+  text: '神隱一個敵方角色，並抽 2 張。', target: T.eUnit,
+  onPlay: function (s, c) {
+    if (c.target && c.target.unit) banishUnit(s, c.target.unit);
+    draw(s, c.pi, 2);
+  }
+});
+
+C({
+  id: 'ka_eternity', tribe: ['月人'], name: '永遠亭的居民', src: '永', cls: 'kaguya',
+  type: 'unit', cost: 3, atk: 2, hp: 5, works: ['永'],
+  text: '登場：若你手上有「難題」，此角色 +2/+0。',
+  onPlay: function (s, c) {
+    var has = s.players[c.pi].hand.some(function (h) { return def(h.defId).nandai; });
+    if (has && c.self) buffUnit(c.self, 2, 0);
+  }
+});
+
+C({
+  id: 'bgm_kaguya', name: '竹取飛翔 ～ Lunatic Princess', src: '永', cls: 'neutral', type: 'bgm',
+  cost: 3, unique: true, tutor: 'n_kaguya',
+  text: '發動：從牌庫檢索「蓬萊山輝夜」。你手上的「難題」費用 -1。',
+  costMod: function (s, owner, d, casterPi) {
+    return (casterPi === owner && d.nandai) ? -1 : 0;
+  }
+});

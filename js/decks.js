@@ -294,6 +294,53 @@ var PRESET_DECKS = {
       ['n_mystia', 3], ['n_wriggle', 3], ['n_meiling', 3], ['n_keine', 3],
       ['n_maid', 2], ['n_fairy', 2], ['n_reisen', 2], ['n_sp_omamori', 2],
       ['n_ran', 2], ['n_eirin', 1], ['n_kaguya', 1]
+    ]  },
+
+  /* 藥師：給關鍵角色反魂，對手的移除要多花一次 */
+  eirin: {
+    bgm: 'bgm_eirin',
+    cards: [
+      ['ei_moonrabbit', 4], ['ei_mixture', 3], ['ei_medicine', 3], ['ei_usagi', 3],
+      ['ei_astro', 2], ['ei_hourai', 1],
+      ['n_eirin', 2], ['n_reisen', 3], ['n_tewi', 3], ['n_maid', 3],
+      ['n_meiling', 3], ['n_keine', 2], ['n_fairy', 2], ['n_sp_omamori', 2],
+      ['n_kaguya', 2], ['c_sakuya', 1], ['c_remilia', 1]
+    ]
+  },
+
+  /* 狂氣：對手鋪得愈滿，她的技能愈痛 */
+  reisen: {
+    bgm: 'bgm_reisen',
+    cards: [
+      ['re_eye', 4], ['re_madness', 3], ['re_wave', 3], ['re_lunatic', 3],
+      ['re_wd_kyouki', 2], ['re_discarder', 1],
+      ['n_reisen', 3], ['n_tewi', 3], ['n_meiling', 3], ['n_keine', 3],
+      ['n_maid', 2], ['n_mystia', 2], ['n_sp_omamori', 2], ['n_eirin', 2],
+      ['n_kaguya', 1], ['c_yukari', 1], ['c_reimu', 1], ['n_fairy', 1]
+    ]
+  },
+
+  /* 幸運：讓費用消失，靠白賺的那一點累積優勢 */
+  tewi: {
+    bgm: 'bgm_tewi',
+    cards: [
+      ['te_rabbit', 4], ['te_fortune', 3], ['te_luck', 3], ['te_lucky', 3],
+      ['te_trap', 3], ['te_wd_kouun', 2],
+      ['n_tewi', 4], ['n_maid', 3], ['n_fairy', 3], ['n_reisen', 2],
+      ['n_meiling', 2], ['n_chen', 2], ['n_sp_omamori', 2], ['n_keine', 2],
+      ['n_ran', 1], ['n_eirin', 1]
+    ]
+  },
+
+  /* 五個難題：技能每回合洗一個難題進手，單張都比同費強但抽到哪個由不得你 */
+  kaguya: {
+    bgm: 'bgm_kaguya',
+    cards: [
+      ['ka_eternity', 4], ['ka_koromo', 2], ['ka_tama', 2], ['ka_hachi', 2],
+      ['ka_hourai', 1], ['ka_kai', 1],
+      ['n_kaguya', 2], ['n_eirin', 2], ['n_reisen', 3], ['n_tewi', 3],
+      ['n_keine', 3], ['n_meiling', 3], ['n_maid', 3], ['n_fairy', 3],
+      ['n_sp_omamori', 2], ['n_koakuma', 2], ['c_remilia', 1], ['c_sakuya', 1]
     ]
   }
 };
@@ -306,7 +353,8 @@ var BUILD_NAMES = {
   koakuma: '圖書館助手', patchouli: '七曜賢者', flandre: '徹底破壞',
   lily: '隨機春告', prismriver: '幻想合奏',
   letty: '蔓延之冬', chen: '一擊衝鋒', ran: '式神壓縮',
-  keine: '不壞之盾', wriggle: '蟲群夜襲', mystia: '夜盲'
+  keine: '不壞之盾', wriggle: '蟲群夜襲', mystia: '夜盲',
+  eirin: '藥與反魂', reisen: '狂氣', tewi: '幸運', kaguya: '五個難題'
 };
 
 function presetDeck(heroId) {

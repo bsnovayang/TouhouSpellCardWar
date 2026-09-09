@@ -407,6 +407,7 @@ function makeUnit(s, pi, defId, opts) {
     atkZero: false,
     attacksMade: 0,
     extraAttackPerTurn: 0,
+    revive: 0,        // 反魂：死去時以 1 生命回到場上的剩餘次數
     dead: false
   };
 }
@@ -558,8 +559,15 @@ function startChoice(s, pi, options, label) {
 
 function grantChoice(s, pi, defId) {
   var p = s.players[pi];
-  if (p.hand.length < HAND_MAX) p.hand.push(makeCard(defId));
-  else p.grave.push({ defId: defId });
+  var tweak = s._discoverTweak;
+  s._discoverTweak = null;
+  if (p.hand.length < HAND_MAX) {
+    var card = makeCard(defId);
+    if (tweak) tweak(s, pi, card);
+    p.hand.push(card);
+  } else {
+    p.grave.push({ defId: defId });
+  }
   logMsg(s, '『探尋』取得「' + def(defId).name + '」');
 }
 
@@ -575,6 +583,15 @@ function resolveChoice(s, defId) {
 }
 
 /* 探尋一張「騷靈」卡 */
+/* 條件式探尋：把判斷式交給呼叫端，任何「探尋符合 X 的卡」都能用這個。
+   discover 出來的卡可以再加工（例如因幡帝把費用降到 0）。 */
+function discoverWhere(s, pi, predicate, n, label, tweak) {
+  var opts = discoverPool(s, predicate, n || 3);
+  if (!opts.length) { logMsg(s, '『探尋』找不到符合的卡'); return; }
+  s._discoverTweak = tweak || null;
+  startChoice(s, pi, opts, label || '探尋');
+}
+
 function discoverTribe(s, pi, tribe, n) {
   startChoice(s, pi, discoverPool(s, function (d) {
     return hasTribe(d, tribe);
@@ -624,6 +641,17 @@ function cleanupDeaths(s) {
             logMsg(s, '「' + d.name + '」被神隱');
             continue;
           }
+          // 反魂：以 1 生命回到場上。放在墓地與「死去」之前 ——
+          // 她根本沒有真的死掉，所以不進墓地、也不觸發任何死去效果。
+          // 被神隱時上面已經 continue 了，所以藥救不回被神隱的角色，這是刻意的。
+          if ((u.revive || 0) > 0 && !u.silenced) {
+            u.revive--;
+            u.dead = false;
+            u.dmg = Math.max(0, maxHpOf(u) - 1);
+            arr[i] = u;
+            logMsg(s, '『反魂』—「' + d.name + '」以 1 點生命回到場上');
+            continue;
+          }
           logMsg(s, '「' + d.name + '」被擊破');
           s.players[pi].grave.push({ defId: u.defId });
           s.players[pi].deathsThisTurn = (s.players[pi].deathsThisTurn || 0) + 1;
@@ -649,6 +677,22 @@ function checkWin(s) {
   else if (d1) s.winner = 0;
   else if (d0) s.winner = 1;
   if (s.winner != null) s.phase = 'over';
+}
+
+/* 強制交戰：讓 a 攻擊 b，雙方互相結算傷害。
+   不能走 doAttack —— 那裡的 canAttack 規定「只有行動方能攻擊」，
+   而這是在我方回合強迫對手的兩個角色打起來。
+   關鍵字（彈幕、貫通、吸血）刻意不套用：這不是那個角色自己選的攻擊，
+   只是被逼著揮出去，套上全部效果會讓一張卡的結算複雜到看不懂。 */
+function forceClash(s, a, b) {
+  if (!a || !b || a === b || a.dead || b.dead) return;
+  logMsg(s, '『狂氣』—「' + def(a.defId).name + '」被迫攻擊「' + def(b.defId).name + '」');
+  // 不傳「傷害來源」—— dmgUnit 會用它結算吸血，
+  // 傳了的話「逼吸血鬼互打」反而變成幫對手回血，跟上面說的不套用關鍵字互相矛盾。
+  var ad = atkOf(a), bd = atkOf(b);
+  if (ad > 0) dmgUnit(s, b, ad);
+  if (bd > 0) dmgUnit(s, a, bd);
+  cleanupDeaths(s);
 }
 
 /* ---------- 目標合法性 ---------- */
