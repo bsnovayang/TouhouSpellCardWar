@@ -290,8 +290,10 @@ function renderHeroRow(nodeId, pi, isFoe) {
   // 英雄技能
   var pw = el('button', 'btn hpow');
   var hf = heroFormOf(p.heroId, G, p.idx);
-  pw.innerHTML = '<b>' + hf.power + '</b>（' + heroPowerCostLabel(p.heroId, G, p.idx) + '）<br>' +
-    '<span style="color:#a79ec6">' + markKeywords(hf.powerText) + '</span>';
+  // 說明文字包成 .ptext —— 窄螢幕時整段收起來只留名稱與費用，
+  // 說明本來就還能從提示框看到，不必在每一格都佔掉三行寬度。
+  pw.innerHTML = '<b>' + hf.power + '</b>（' + heroPowerCostLabel(p.heroId, G, p.idx) + '）' +
+    '<span class="ptext">' + markKeywords(hf.powerText) + '</span>';
   pw.disabled = isFoe || !!canHeroPower(G, pi, null) && canHeroPower(G, pi, null) !== 'NEED_TARGET';
   if (!isFoe) pw.onclick = onHeroPowerClick;
   n.appendChild(pw);

@@ -224,7 +224,54 @@ const wait = ms => new Promise(r => setTimeout(r, ms));
     if (!(await st(() => document.getElementById('tooltip').hidden))) {
       errors.push('切換畫面後提示框還卡在畫面上');
     } else {
-      console.log('提示框：切換畫面後正確關閉 ✓');
+      /* --- 小螢幕版面 --- */
+  /* iPhone SE（375×667）曾經整個壞掉：英雄列 flex-wrap:nowrap，內容需要 509px
+     但容器只有 355px，技能說明溢出 214px 壓在旁邊的元素上；垂直也差 10px、
+     手牌被切掉 43px。這一段確保那些修正不會被之後的改動弄回去。 */
+  for (const [nm, vw, vh] of [[ 'iPhone SE', 375, 667 ], [ 'iPhone 14', 390, 844 ]]) {
+    await page.setViewport({ width: vw, height: vh, isMobile: true, hasTouch: true });
+    // 這時候上面那局已經結束了，盤面元素全是 0 高 —— 得先擺一個活的對局，
+    // 否則量到的永遠是 0，測試會變成「永遠通過」。
+    await page.evaluate(() => {
+      startBattle(presetDecks().find(x => x.heroId === 'reimu'), 'letty', 'me');
+      doMulligan(G, 0, []); doMulligan(G, 1, []);
+      document.getElementById('overlay').hidden = true;
+      for (let i = 0; i < 5; i++) { summon(G, 0, 'n_meiling', {}); summon(G, 1, 'n_ran', {}); }
+      G.players[0].wards[0] = makeCard('n_wd_shimenawa');
+      recalc(G); renderGame();
+    });
+    await wait(250);
+    const r = await page.evaluate(() => {
+      const H = s => { const e = document.querySelector(s); return e ? e.getBoundingClientRect().height : 0; };
+      const need = H('#foe-hero-row') + H('#foe-units') + H('#foe-wards') + H('.midbar') +
+        H('#me-wards') + H('#me-units') + H('#me-hero-row') + H('#me-hand');
+      const bad = [];
+      ['#foe-hero-row', '#me-hero-row'].forEach(sel => {
+        const row = document.querySelector(sel);
+        if (!row) return;
+        if (row.scrollWidth > row.getBoundingClientRect().width + 1) bad.push(sel + ' 內容溢出');
+        row.querySelectorAll('*').forEach(e => {
+          const b = e.getBoundingClientRect();
+          if (b.width > 0 && b.right > window.innerWidth + 1) bad.push(sel + ' 內有元素超出畫面');
+        });
+      });
+      const hand = document.querySelector('#me-hand').getBoundingClientRect();
+      return { need: Math.round(need), vh: window.innerHeight, bad: [...new Set(bad)],
+        handOff: Math.round(hand.bottom - window.innerHeight),
+        ox: document.documentElement.scrollWidth - window.innerWidth };
+    });
+    if (!r.need) errors.push(nm + '：量到 0 —— 盤面沒有渲染，這個檢查等於沒做');
+    if (r.ox > 0) errors.push(nm + '：橫向溢出 ' + r.ox + 'px');
+    if (r.need > r.vh) errors.push(nm + '：垂直需求 ' + r.need + ' 超過可視高度 ' + r.vh);
+    if (r.handOff > 0) errors.push(nm + '：手牌超出畫面 ' + r.handOff + 'px');
+    r.bad.forEach(x => errors.push(nm + '：' + x));
+    console.log('小螢幕 ' + nm + ' ' + vw + '×' + vh + '：垂直 ' + r.need + '/' + r.vh +
+      '、手牌' + (r.handOff > 0 ? '超出' : '在畫面內') + '、英雄列' + (r.bad.length ? '有溢出' : '正常'));
+  }
+  await page.setViewport({ width: 1500, height: 980, isMobile: false, hasTouch: false });
+  await wait(200);
+
+  console.log('提示框：切換畫面後正確關閉 ✓');
     }
   }
 

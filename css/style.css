@@ -217,6 +217,7 @@ input{min-width:160px}
 .sp i.used{background:#241f3e}
 .spnum{font-size:12px;color:var(--blue);font-weight:700}
 .hpow{border-radius:12px;padding:6px 10px;font-size:11.5px;line-height:1.25;max-width:170px;text-align:left}
+.hpow .ptext{display:block;color:#a79ec6}
 .deckinfo{font-size:11px;color:var(--dim);text-align:center;line-height:1.3}
 
 /* 中間欄 */
@@ -359,3 +360,52 @@ input{min-width:160px}
 /* 專屬卡：左側英雄色條 */
 .card.own{border-left:3px solid var(--line)}
 .dl-row.own{border-left:3px solid var(--line);padding-left:5px}
+
+
+/* ============================================================
+   小螢幕修正
+
+   量到的問題（iPhone SE 375×667）：
+     · 英雄列是 flex-wrap:nowrap，內容需要 509px 但容器只有 355px，
+       技能說明文字溢出 214px 直接壓到旁邊的元素上
+     · 垂直需求 677px 比可視高度 667px 多 10px，手牌被切掉 43px
+
+   刻意不用換行（flex-wrap:wrap）解決 —— 換行會讓英雄列變高，
+   而高度正是最吃緊的資源。改成把最長的東西收起來。
+   ============================================================ */
+
+@media (max-width:560px){
+  /* 技能說明收起來，只留名稱與費用。完整說明點下去仍看得到 */
+  .hpow .ptext{display:none}
+  .hpow{max-width:112px;font-size:11px;padding:6px 8px}
+  /* 英雄名字過長就截斷，不要撐破自己的框 */
+  .hero .hname{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:88px}
+  .hero{padding:5px 8px;gap:6px}
+  .hero .av{width:30px;height:30px;font-size:13px}
+  .hero .hhp{font-size:16px}
+  .sp{max-width:76px;gap:2px}
+  .sp i{width:8px;height:8px}
+  .spnum{font-size:10px}
+  .deckinfo{font-size:10px}
+  .hero-row{gap:6px;padding:3px 2px}
+}
+
+/* 矮螢幕（iPhone SE 直向、多數手機橫向）：把每一段都壓一點 */
+@media (max-height:700px){
+  .lane.units{min-height:86px}
+  .lane.wards{min-height:42px}
+  .unit .un{font-size:9.5px}
+  .unit .ust{font-size:13px}
+  .hand{min-height:118px;padding:4px 4px 2px}
+  .hand .card{min-height:104px;width:92px}
+  .card .nm{font-size:10.5px;margin-top:10px}
+  .card .tx{font-size:9px}
+  .midbar{padding:2px 0}
+  .board{padding:4px 8px;gap:3px}
+}
+
+/* 觸控裝置：牌表的 ± 按鈕原本只有 22px，低於 44px 的觸控建議 */
+@media (pointer:coarse){
+  .dlbtn{width:40px;height:40px;font-size:18px}
+  .dl-row{padding:7px 8px}
+}
