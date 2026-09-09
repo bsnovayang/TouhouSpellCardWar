@@ -40,14 +40,23 @@ const URL = 'http://localhost:8899/index.html';
   step('點 開始對戰');
   for (const p of [A, B]) { await click(p, '#btn-play'); await wait(250); }
   step('畫面：' + await A.evaluate(() => document.querySelector('.screen.active').id));
-  await A.evaluate(() => { document.getElementById('room-code').value = 'TEST'; });
-  await B.evaluate(() => { document.getElementById('room-code').value = 'TEST'; });
+  // 兩邊刻意挑不同英雄 —— 否則「兩邊都變成開房者的英雄」這種 bug 測不出來
+  await A.evaluate(() => {
+    document.getElementById('room-code').value = 'TEST';
+    chosenDeckId = 'preset_reimu'; renderSelect();
+  });
+  await B.evaluate(() => {
+    document.getElementById('room-code').value = 'TEST';
+    chosenDeckId = 'preset_kaguya'; renderSelect();
+  });
 
   step('主機開房');
   await click(A, '#btn-host'); await wait(500);
   step('主機畫面：' + await A.evaluate(() => document.querySelector('.screen.active').id) +
     '　overlay=' + await A.evaluate(() => document.getElementById('overlay').hidden));
-  step('客人加入');
+    const soloHost = await A.evaluate(() => ({ hasG: !!G, overlay: !document.getElementById('overlay').hidden }));
+  console.log('  客人加入前，主機 G=' + soloHost.hasG + '　調度介面=' + soloHost.overlay);
+step('客人加入');
   await click(B, '#btn-join'); await wait(800);
   step('客人 G=' + await B.evaluate(() => G ? G.phase : 'null'));
 
@@ -56,7 +65,8 @@ const URL = 'http://localhost:8899/index.html';
     phase: G ? G.phase : null, active: G ? G.active : null,
     myHand: G ? G.players[NET.side].hand.map(c => c.defId).slice(0, 3) : null,
     foeHand: G ? G.players[1 - NET.side].hand.map(c => c.defId) : null,
-    status: (document.getElementById('net-status') || {}).textContent
+    status: (document.getElementById('net-status') || {}).textContent,
+    heroes: G ? [G.players[0].heroId, G.players[1].heroId] : null
   }), who);
 
   console.log('=== 開房／加入後 ===');
@@ -94,6 +104,9 @@ const URL = 'http://localhost:8899/index.html';
 
     /* 斷言 —— 沒有這一段的話這支測試只會印字，不會擋下任何回歸 */
   const fail = [];
+  if (soloHost.hasG) fail.push('客人還沒加入，主機就已經有對局了');
+  if (soloHost.overlay) fail.push('客人還沒加入，主機就跳出調度介面了');
+  if (a2.heroes && a2.heroes[0] === a2.heroes[1]) fail.push('雙方英雄一樣 —— 客人的牌組沒有被採用');
   if (a2.myHand.some(x => x === '?')) fail.push('主機看不到自己的手牌');
   if (b2.myHand.some(x => x === '?')) fail.push('客人看不到自己的手牌');
   if (!a2.foeHand.every(x => x === '?')) fail.push('主機看得到對手手牌 —— 遮蔽失效');

@@ -81,28 +81,62 @@ function dispatch(a) {
    結果廣播時 onState 把 G 換成遮蔽版本，
    下一次廣播就變成「對已經遮蔽過的盤面再遮蔽一次」——
    連客人自己的手牌都被抹成 '?'。 */
-var HOST = { full: null };
+var HOST = { full: null, myDeck: null };
 
 function hostBroadcast() {
   NET.transport.send({ t: 'state', side: 1 - NET.side, s: redact(HOST.full, 1 - NET.side) });
   if (NET.onState) NET.onState(redact(HOST.full, NET.side));
 }
 
-/* 主機收到客人的動作 */
+/* 主機收到客人的訊息 */
 function hostOnMessage(msg) {
+  if (msg.t === 'join') {
+    // 對局在這一刻才被建立 —— 在知道對手帶什麼牌組之前不能開始。
+    if (HOST.full) { NET.transport.send({ t: 'full', m: '房間已經有人了' }); return; }
+    var errs = validateDeck(msg.deck);
+    if (errs.length) {
+      NET.transport.send({ t: 'reject', m: '對手的牌組不合法：' + errs.join('、') });
+      if (NET.onInfo) NET.onInfo('reject', '對手的牌組不合法，已拒絕');
+      return;
+    }
+    hostStart(msg.deck);
+    return;
+  }
+  if (!HOST.full) return;               // 還沒開局，其他訊息一律忽略
   if (msg.t === 'act') {
     var err = applyAction(HOST.full, 1 - NET.side, msg.a);
     if (err) { NET.transport.send({ t: 'err', m: err }); return; }
-    hostBroadcast();
-  } else if (msg.t === 'hello') {
     hostBroadcast();
   } else if (msg.t === 'bye') {
     if (NET.onInfo) NET.onInfo('left', '對手離開了');
   }
 }
 
+/* 雙方牌組都到齊了才真的開局 */
+function hostStart(guestDeck) {
+  var mine = HOST.myDeck;
+  HOST.full = newGame({
+    p0: { heroId: mine.heroId, deck: mine.cards.slice(), bgm: mine.bgm || null },
+    p1: { heroId: guestDeck.heroId, deck: guestDeck.cards.slice(), bgm: guestDeck.bgm || null },
+    firstPlayer: null            // PvP 一律由權威端隨機決定
+  });
+  G = redact(HOST.full, 0);
+  G.humanSide = 0;
+  NET.transport.send({ t: 'begin', side: 1 });
+  hostBroadcast();
+  if (NET.onInfo) NET.onInfo('begin', '對手已加入');
+}
+
 /* 客人收到主機的訊息 */
 function guestOnMessage(msg) {
+  if (msg.t === 'full' || msg.t === 'reject') {
+    if (NET.onInfo) NET.onInfo('reject', msg.m);
+    return;
+  }
+  if (msg.t === 'begin') {
+    if (NET.onInfo) NET.onInfo('begin', '已連上主機');
+    return;
+  }
   if (msg.t === 'state' && msg.side === NET.side) {
     G = msg.s;
     G.humanSide = NET.side;
@@ -131,29 +165,26 @@ function localChannel(room, onMessage) {
 
 /* ---------- 對外：開一場雙人對局 ---------- */
 
-/* 主機：建立盤面並等客人連進來 */
-function netHost(room, myDeck, foeDeck) {
+/* 主機：開房等待。**這裡不建立對局** ——
+   要等客人帶著自己的牌組連進來（hostStart）才開始，
+   否則對手還沒到就能開打，而且他會被迫用開房者的英雄。 */
+function netHost(room, myDeck) {
   NET.mode = 'host';
   NET.side = 0;
   NET.matchId = room;
-  HOST.full = newGame({
-    p0: { heroId: myDeck.heroId, deck: myDeck.cards.slice(), bgm: myDeck.bgm || null },
-    p1: { heroId: foeDeck.heroId, deck: foeDeck.cards.slice(), bgm: foeDeck.bgm || null },
-    firstPlayer: null            // PvP 一律由權威端隨機決定
-  });
-  G = redact(HOST.full, 0);
-  G.humanSide = 0;
+  HOST.full = null;
+  HOST.myDeck = myDeck;
+  G = null;
   NET.transport = localChannel(room, hostOnMessage);
-  return G;
 }
 
-/* 客人：連上房間，盤面等主機推過來 */
-function netJoin(room) {
+/* 客人：帶著自己的牌組連上房間 */
+function netJoin(room, myDeck) {
   NET.mode = 'guest';
   NET.side = 1;
   NET.matchId = room;
   NET.transport = localChannel(room, guestOnMessage);
-  NET.transport.send({ t: 'hello' });
+  NET.transport.send({ t: 'join', deck: myDeck });
 }
 
 function netLeave() {

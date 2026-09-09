@@ -50,15 +50,17 @@
     if (errs.length) { alert('牌組不合法：' + errs.join(', ')); return; }
     // 客人的牌組還沒傳過來，先用同一副開場；之後接伺服器時改成等客人送牌組
     netAttach();
-    netHost(room, d, d);
+    netHost(room, d);
     showScreen('game');
-    netStatus('房間 ' + room + '：等待對手加入…');
-    showMulligan();
+    netStatus('房間 ' + room + '：等待對手加入…（對局要等對方連進來才會開始）');
   };
   $('btn-join').onclick = function () {
     var room = roomCode(); if (!room) return;
+    var d = findDeck(chosenDeckId) || presetDecks()[0];
+    var errs = validateDeck(d);
+    if (errs.length) { alert('牌組不合法：' + errs.join(', ')); return; }
     netAttach();
-    netJoin(room);
+    netJoin(room, d);
     showScreen('game');
     netStatus('房間 ' + room + '：連線中…');
   };

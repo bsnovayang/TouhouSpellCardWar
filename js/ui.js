@@ -1277,6 +1277,7 @@ function refreshMenu() {
    所以不會有「本地改了一半又被覆蓋」的閃爍問題。 */
 function netAttach() {
   NET.onState = function (s) {
+    if (!s) return;
     G = s;
     ME = NET.side; AI = 1 - NET.side;
     busy = (G.active !== ME);
@@ -1288,6 +1289,7 @@ function netAttach() {
   NET.onInfo = function (kind, msg) {
     netStatus(msg);
     if (kind === 'left') toast('對手離開了');
+    if (kind === 'reject') { toast(msg); netLeave(); showScreen('select'); }
   };
 }
 
