@@ -149,6 +149,10 @@ function guestOnMessage(msg) {
       msg.gone ? '對手斷線中…' : '對手回來了');
     return;
   }
+  if (msg.t === 'hello') {
+    NET.side = msg.side;                 // 以伺服器的指派為準
+    return;
+  }
   if (msg.t === 'full' || msg.t === 'reject') {
     if (NET.onInfo) NET.onInfo('reject', msg.m);
     return;
@@ -229,24 +233,69 @@ function netConnect(room, myDeck, side) {
   aliveStart();
 }
 
-/* 自動配對：先問伺服器要一個房間，再連上去 */
-function netMatchmake(myDeck, onWaiting) {
+/* 自動配對：先問伺服器要一個房間，再連上去。
+
+   等待中要定期回報「我還在」——伺服器靠這個把早就關掉分頁的人清掉，
+   否則後來的人會被配進一間沒人的房間，乾等到天荒地老。
+   帶著自己的房號回去，伺服器才不會把我跟我自己配成一對。 */
+var QUEUE = { iv: null, room: '' };
+
+function queueStop() {
+  if (QUEUE.iv) clearInterval(QUEUE.iv);
+  QUEUE.iv = null;
+  QUEUE.room = '';
+}
+
+function matchmakePost(skip) {
   var http = SERVER_URL.replace(/^ws/, 'http');
-  return fetch(http + '/matchmake', { method: 'POST' })
-    .then(function (r) { return r.json(); })
-    .then(function (j) {
-      if (j.waiting && onWaiting) onWaiting(j.room);
-      netConnect(j.room, myDeck, j.side);
-      return j;
-    });
+  return fetch(http + '/matchmake', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ skip: skip || null })
+  }).then(function (r) { return r.json(); });
+}
+
+function netMatchmake(myDeck, onWaiting) {
+  queueStop();
+  return matchmakePost(null).then(function (j) {
+    if (j.waiting) {
+      if (onWaiting) onWaiting(j.room);
+      QUEUE.room = j.room;
+      QUEUE.iv = setInterval(function () {
+        if (G || !QUEUE.room) { queueStop(); return; }   // 已經開局就不用再續命
+        matchmakePost(QUEUE.room).catch(function () { });
+      }, 20000);
+    }
+    netConnect(j.room, myDeck, j.side);
+    return j;
+  });
 }
 
 /* ---------- 對外：開一場雙人對局 ---------- */
 
+/* 開房與加房。
+
+   有設定伺服器時兩者其實是同一件事 —— 都只是連上同一個房間號，
+   誰是先手由伺服器看「誰先連上」決定。原本這兩個函式無條件走
+   BroadcastChannel，那只在同一台裝置的分頁之間有效，
+   手機對電腦永遠連不上。
+
+   沒有伺服器時才退回 BroadcastChannel，讓整套雙人流程在沒有後端的
+   情況下仍然測得起來（tools/pvptest.js 就是走這條）。 */
+function netHost(room, myDeck) {
+  if (SERVER_URL) return netConnect(room, myDeck, 0);
+  return netHostLocal(room, myDeck);
+}
+
+function netJoin(room, myDeck) {
+  if (SERVER_URL) return netConnect(room, myDeck, 1);
+  return netJoinLocal(room, myDeck);
+}
+
 /* 主機：開房等待。**這裡不建立對局** ——
    要等客人帶著自己的牌組連進來（hostStart）才開始，
    否則對手還沒到就能開打，而且他會被迫用開房者的英雄。 */
-function netHost(room, myDeck) {
+function netHostLocal(room, myDeck) {
   NET.mode = 'host';
   NET.side = 0;
   NET.matchId = room;
@@ -258,7 +307,7 @@ function netHost(room, myDeck) {
 }
 
 /* 客人：帶著自己的牌組連上房間 */
-function netJoin(room, myDeck) {
+function netJoinLocal(room, myDeck) {
   NET.mode = 'guest';
   NET.side = 1;
   NET.matchId = room;
@@ -268,6 +317,7 @@ function netJoin(room, myDeck) {
 }
 
 function netLeave() {
+  queueStop();
   timerStop();
   aliveStop();
   if (NET.transport) {

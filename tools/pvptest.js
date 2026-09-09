@@ -25,7 +25,10 @@ const URL = 'http://localhost:8899/index.html';
     const p = await b.newPage();
     await p.setViewport({ width: 1400, height: 900 });
     p.on('pageerror', e => { errs.push(name + ': ' + e.message); console.log('  ⚠ ' + name + ' 頁面錯誤：' + e.message.slice(0,120)); });
-    await p.goto(URL, { waitUntil: 'networkidle0' });
+    await p.goto(URL, { waitUntil: 'networkidle0' });
+    // 清掉伺服器位址，強制走 BroadcastChannel。這支測試要能離線跑，
+    // 不該依賴線上的 Worker，也不該把測試房間丟進正式配對佇列。
+    await p.evaluate(() => { SERVER_URL = ''; });
     await wait(300);
     return p;
   };

@@ -87,14 +87,39 @@ export class Match {
     await this.load();
     const url = new URL(request.url);
 
+    /* 給配對佇列問「這個房間還有人連著嗎」。
+       比看時間戳可靠 —— 等待中的玩家本來就已經開著 WebSocket。 */
+    if (url.pathname === '/alive') {
+      return json({ n: this.state.getWebSockets().length });
+    }
+
     /* ---------- 配對佇列（只有 lobby 這個 instance 會走到） ---------- */
     if (url.pathname === '/matchmake') {
+      /* skip = 呼叫者自己的房間。等待中的玩家會定期回來續命，
+         沒有這個欄位的話他會跟「自己」配對成功。 */
+      let skip = null;
+      try { skip = (await request.json()).skip || null; } catch (e) { }
+
       const waiting = await this.state.storage.get('waiting');
-      if (waiting && Date.now() - waiting.at < 60000) {
-        await this.state.storage.delete('waiting');
-        return json({ room: waiting.room, side: 1 });
+
+      if (waiting && waiting.room === skip) {          // 自己回來續命
+        await this.state.storage.put('waiting', { room: skip, at: Date.now() });
+        return json({ room: skip, side: 0, waiting: true });
       }
-      const room = Math.random().toString(36).slice(2, 8).toUpperCase();
+
+      if (waiting) {
+        /* 原本這裡用「60 秒內才算數」，但手機和電腦不可能在一分鐘內
+           先後按下配對，兩邊會各自開房、永遠等不到對方。
+           改成直接問那個房間還有沒有人連著。剛拿到房號還來不及接上
+           WebSocket 的那一瞬間，用 10 秒的寬限補起來。 */
+        const fresh = Date.now() - waiting.at < 10000;
+        const alive = fresh || await this.roomHasPlayer(waiting.room);
+        await this.state.storage.delete('waiting');
+        if (alive) return json({ room: waiting.room, side: 1 });
+        // 對方早就走了，這筆丟掉，往下重開一間
+      }
+
+      const room = skip || Math.random().toString(36).slice(2, 8).toUpperCase();
       await this.state.storage.put('waiting', { room, at: Date.now() });
       return json({ room, side: 0, waiting: true });
     }
@@ -112,7 +137,20 @@ export class Match {
     // Hibernation API：閒置時不計 duration
     this.state.acceptWebSocket(pair[1], ['side:' + side]);
     this.lastSeen[side] = Date.now();
+    /* 先後手由「誰先連上」決定，客戶端猜不到 —— 房間碼模式下開房的人
+       未必先連上。所以由這裡告知，客戶端不要自己假設。 */
+    pair[1].send(JSON.stringify({ t: 'hello', side }));
     return new Response(null, { status: 101, webSocket: pair[0] });
+  }
+
+  async roomHasPlayer(room) {
+    try {
+      const stub = this.env.MATCH.get(this.env.MATCH.idFromName('match:' + room));
+      const r = await stub.fetch('https://do/alive');
+      return (await r.json()).n > 0;
+    } catch (e) {
+      return false;                    // 問不到就當作沒人，寧可重開一間
+    }
   }
 
   sideOf(ws) {
