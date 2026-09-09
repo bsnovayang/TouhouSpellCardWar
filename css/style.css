@@ -1,0 +1,361 @@
+/* ============================================================
+   東方符卡大戰 — 樣式（純 CSS 卡面，無圖片）
+   ============================================================ */
+:root{
+  --bg:#12101c; --bg2:#1b1830; --panel:#221e3a; --panel2:#2b2648;
+  --line:#3a3358; --txt:#eae6f7; --dim:#a79ec6;
+  --red:#e05a6d; --gold:#e8c86a; --blue:#7fb8e8; --green:#8fd6a8; --purple:#b9a7e0;
+  --unit:#6fa8dc; --spellc:#e07ba0; --ward:#9b7fe0; --field:#67c2a5;
+  --r:10px;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+/* hidden 屬性必須永遠贏過各元件自己的 display（.overlay/.editor 都設了 display，
+   會蓋掉瀏覽器預設的 [hidden]{display:none}，導致覆蓋層一直擋住點擊） */
+[hidden]{display:none!important}
+html,body{height:100%}
+body{
+  margin:0;background:
+    radial-gradient(1200px 700px at 50% -10%,#2a2246 0%,transparent 60%),
+    radial-gradient(900px 600px at 100% 110%,#3a1c2c 0%,transparent 60%),
+    var(--bg);
+  color:var(--txt);
+  font:14px/1.55 "Noto Sans TC","Microsoft JhengHei","PingFang TC",system-ui,sans-serif;
+  overflow:hidden;
+}
+button,input,select{font:inherit;color:inherit}
+
+/* ---------- 螢幕切換 ---------- */
+.screen{position:fixed;inset:0;display:none;flex-direction:column;overflow:auto}
+.screen.active{display:flex}
+
+/* ---------- 通用元件 ---------- */
+.btn{
+  background:var(--panel2);border:1px solid var(--line);color:var(--txt);
+  padding:8px 14px;border-radius:var(--r);cursor:pointer;transition:.12s;white-space:nowrap
+}
+.btn:hover:not(:disabled){background:#3a3360;border-color:#6b5fa8;transform:translateY(-1px)}
+.btn:disabled{opacity:.4;cursor:not-allowed}
+.btn.primary{background:linear-gradient(160deg,#b0405c,#7a2a48);border-color:#d4657f}
+.btn.primary:hover{background:linear-gradient(160deg,#c94a68,#8c3254)}
+.btn.danger{border-color:#a3455c;color:#ff9db0}
+.btn.big{padding:12px 28px;font-size:16px;min-width:200px}
+.btn.small{padding:4px 10px;font-size:12px}
+.bar{display:flex;align-items:center;justify-content:space-between;gap:12px;
+  padding:10px 16px;background:rgba(20,17,36,.9);border-bottom:1px solid var(--line);
+  position:sticky;top:0;z-index:5;backdrop-filter:blur(8px)}
+.bar h2{margin:0;font-size:17px;letter-spacing:.1em}
+.pad{padding:18px;max-width:1100px;margin:0 auto;width:100%}
+.sect{color:var(--dim);font-size:13px;letter-spacing:.15em;margin:18px 0 8px;font-weight:400}
+.row-inline{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:12px 0}
+input,select{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:7px 10px}
+input{min-width:160px}
+
+/* ---------- 主選單 ---------- */
+.menu-wrap{margin:auto;text-align:center;padding:24px}
+.logo{font-size:clamp(34px,8vw,62px);margin:0;letter-spacing:.12em;
+  background:linear-gradient(180deg,#fff 20%,#e8a0b4 60%,#b4506e);
+  -webkit-background-clip:text;background-clip:text;color:transparent;
+  text-shadow:0 0 40px rgba(224,90,109,.25)}
+.logo span{background:linear-gradient(180deg,#fff 20%,#e8c86a 60%,#a8862c);
+  -webkit-background-clip:text;background-clip:text;color:transparent}
+.sub{color:var(--dim);letter-spacing:.2em;margin:6px 0 34px;font-size:13px}
+.menu-btns{display:flex;flex-direction:column;gap:12px;align-items:center}
+.foot{color:#6b6390;font-size:12px;margin-top:32px}
+
+/* ---------- 牌組卡片 ---------- */
+.deck-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:12px}
+.deck-card{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);
+  padding:12px 14px;cursor:pointer;transition:.12s;border-left:4px solid var(--line)}
+.deck-card:hover{background:var(--panel2);transform:translateY(-2px)}
+.deck-card.sel{border-color:var(--gold);box-shadow:0 0 0 2px rgba(232,200,106,.35)}
+.deck-card b{display:block;font-size:15px}
+.deck-card small{color:var(--dim)}
+
+/* ---------- 牌組編輯器 ---------- */
+.editor{display:grid;grid-template-columns:1fr 340px;gap:14px;padding:14px;height:calc(100% - 52px);min-height:0}
+.editor-left,.editor-right{display:flex;flex-direction:column;min-height:0;gap:8px}
+.pool{overflow:auto;display:grid;grid-template-columns:repeat(auto-fill,minmax(132px,1fr));gap:8px;
+  padding:8px;background:rgba(0,0,0,.18);border-radius:var(--r);flex:1}
+.decklist{overflow:auto;flex:1;background:rgba(0,0,0,.18);border-radius:var(--r);padding:6px}
+.dl-row{display:flex;align-items:center;gap:8px;padding:5px 8px;border-radius:7px;font-size:13px}
+.dl-btns{display:flex;gap:3px;flex:none}
+.dlbtn{
+  width:22px;height:22px;padding:0;line-height:1;border-radius:6px;cursor:pointer;
+  background:rgba(255,255,255,.08);border:1px solid var(--line);color:var(--fg);
+  font-size:14px;font-weight:700;display:grid;place-items:center;transition:.12s
+}
+.dlbtn:hover:not(:disabled){background:rgba(255,255,255,.2)}
+.dlbtn:disabled{opacity:.3;cursor:default}
+.dl-row:hover{background:rgba(255,255,255,.07)}
+.dl-cost{width:20px;height:20px;border-radius:50%;background:#3d6fc0;display:grid;place-items:center;
+  font-size:11px;font-weight:700;flex:none}
+.dl-name{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.dl-n{color:var(--gold);font-weight:700}
+.count{color:var(--gold);font-weight:700}
+.errs{color:#ff9db0;font-size:12px;min-height:18px}
+.curve{display:flex;align-items:flex-end;gap:3px;height:56px;padding:4px;background:rgba(0,0,0,.18);border-radius:var(--r)}
+.curve div{flex:1;background:linear-gradient(180deg,#7f6fd0,#4a3f80);border-radius:3px 3px 0 0;
+  position:relative;min-height:2px;font-size:9px;text-align:center;color:#cfc7ec}
+.curve div span{position:absolute;bottom:-2px;left:0;right:0}
+.filters select,.filters input{padding:5px 8px;font-size:13px}
+
+/* ---------- 卡片 ---------- */
+.card{
+  position:relative;background:linear-gradient(165deg,var(--panel2),#1a1730);
+  border:1px solid var(--line);border-radius:9px;padding:6px 7px 7px;cursor:pointer;
+  transition:.12s;display:flex;flex-direction:column;gap:3px;min-height:112px;user-select:none
+}
+.card:hover{transform:translateY(-3px);border-color:#7d6fc0;box-shadow:0 6px 18px rgba(0,0,0,.5)}
+.card.t-unit{border-top:3px solid var(--unit)}
+.card.t-spell{border-top:3px solid var(--spellc)}
+.card.t-ward{border-top:3px solid var(--ward)}
+.card.t-field{border-top:3px solid var(--field)}
+.card .cost{position:absolute;top:-6px;left:-6px;width:24px;height:24px;border-radius:50%;
+  background:linear-gradient(160deg,#5a86d8,#2c4a8c);border:1px solid #8fb0e8;
+  display:grid;place-items:center;font-weight:700;font-size:13px;box-shadow:0 2px 6px rgba(0,0,0,.5)}
+.card .cost.cheap{background:linear-gradient(160deg,#4fb08a,#25664e);border-color:#7fd8b4}
+.card .nm{font-size:11.5px;font-weight:700;line-height:1.25;margin-top:12px;letter-spacing:.02em}
+.card .tp{font-size:9.5px;color:var(--dim);letter-spacing:.1em}
+.card .tx{font-size:10px;color:#c8c0e4;line-height:1.35;flex:1;overflow:hidden}
+.card .stats{display:flex;justify-content:space-between;font-weight:700;font-size:13px}
+.card .stats .a{color:var(--gold)}
+.card .stats .h{color:#ff8e9e}
+.card .kws{font-size:9.5px;color:var(--green);letter-spacing:.08em}
+.card .cnt{position:absolute;top:-6px;right:-4px;background:#3a3360;border:1px solid var(--gold);
+  color:var(--gold);border-radius:6px;padding:0 5px;font-size:11px;font-weight:700}
+.card.dis{opacity:.42;filter:grayscale(.5)}
+.card.maxed{opacity:.45}
+
+/* ---------- 對戰畫面 ---------- */
+.screen.game{flex-direction:row;overflow:hidden}
+.board{flex:1;display:flex;flex-direction:column;padding:6px 10px;gap:4px;min-width:0}
+.side{display:flex;flex-direction:column;gap:4px}
+.side.foe{}
+.lane{display:grid;grid-template-columns:repeat(5,1fr);gap:6px;min-height:0}
+.lane.units{min-height:104px}
+.lane.wards{min-height:52px}
+.slot{border:1px dashed rgba(255,255,255,.09);border-radius:9px;display:grid;place-items:center;
+  color:#4b4470;font-size:10px;transition:.12s}
+.slot.drop{border-color:var(--gold);background:rgba(232,200,106,.1)}
+
+/* 場上角色 */
+.unit{position:relative;background:linear-gradient(165deg,#2f2a50,#1c1934);
+  border:1px solid var(--line);border-radius:9px;padding:5px;cursor:pointer;
+  display:flex;flex-direction:column;justify-content:space-between;height:100%;transition:.12s;user-select:none}
+.unit:hover{border-color:#8f7fd8}
+.unit .un{font-size:10.5px;font-weight:700;line-height:1.2;text-align:center}
+.unit .ust{display:flex;justify-content:space-between;font-weight:800;font-size:15px;padding:0 2px}
+.unit .ust .a{color:var(--gold)}
+.unit .ust .h{color:#ff8e9e}
+.unit .ust .h.hurt{color:#ff5e78}
+.unit .ubadge{position:absolute;top:-6px;right:-6px;font-size:9px;background:#2a2448;
+  border:1px solid var(--line);border-radius:6px;padding:0 4px;color:var(--green)}
+.unit.taunt{box-shadow:inset 0 0 0 2px rgba(143,214,168,.55)}
+.unit.stealth{opacity:.66;border-style:dashed}
+.unit.ready{box-shadow:0 0 0 2px rgba(232,200,106,.6),0 0 16px rgba(232,200,106,.28)}
+.unit.sel{box-shadow:0 0 0 3px var(--gold);transform:translateY(-3px)}
+.unit.tgt{box-shadow:0 0 0 3px #ff6b7f;animation:pulse 1s infinite}
+.unit.frozen{filter:hue-rotate(160deg) saturate(1.4)}
+
+/* 被封印：卡面文字全部失效，所以整張畫成灰的，並打一個斜線 */
+.unit.silenced{filter:grayscale(.85) brightness(.85)}
+.unit.silenced .un{text-decoration:line-through;color:#9a92b8}
+.unit.silenced .ubadge{color:#b8b0d0;border-color:#7a7298;background:#221e38}
+.unit.silenced::after{
+  content:'';position:absolute;inset:0;border-radius:9px;pointer-events:none;
+  background:repeating-linear-gradient(135deg,transparent 0 6px,rgba(180,172,210,.16) 6px 8px)
+}
+
+/* 本回合還剩幾次攻擊 */
+.atkleft{
+  position:absolute;top:-6px;left:-6px;font-size:10px;font-weight:800;
+  background:#3a2f18;border:1px solid var(--gold);border-radius:6px;
+  padding:0 4px;color:var(--gold);pointer-events:none;z-index:3
+}
+
+/* 血量變化的浮動數字 */
+.floatnum{
+  position:absolute;left:50%;top:2px;font-weight:800;font-size:18px;
+  pointer-events:none;z-index:20;text-shadow:0 1px 3px #000,0 0 8px #000;
+  animation:floatup .95s ease-out forwards
+}
+.floatnum.dmg{color:#ff6b7f}
+.floatnum.heal{color:#7ae0a0}
+@keyframes floatup{
+  0%{opacity:0;transform:translate(-50%,6px) scale(.7)}
+  18%{opacity:1;transform:translate(-50%,-2px) scale(1.2)}
+  100%{opacity:0;transform:translate(-50%,-30px) scale(1)}
+}
+.flash-dmg{animation:flashdmg .55s ease-out}
+.flash-heal{animation:flashheal .55s ease-out}
+@keyframes flashdmg{0%{transform:scale(1.5);color:#fff}100%{transform:scale(1)}}
+@keyframes flashheal{0%{transform:scale(1.5);color:#bfffd8}100%{transform:scale(1)}}
+@keyframes pulse{0%,100%{box-shadow:0 0 0 3px #ff6b7f}50%{box-shadow:0 0 0 5px rgba(255,107,127,.4)}}
+
+/* 結界 / 場地 小卡 */
+.perm{background:linear-gradient(165deg,#2a2450,#191630);border:1px solid var(--line);
+  border-left:3px solid var(--ward);border-radius:8px;padding:4px 6px;font-size:10px;
+  display:flex;flex-direction:column;justify-content:center;cursor:help;height:100%}
+.perm b{font-size:10.5px}
+.perm.field{border-left-color:var(--field)}
+
+/* 英雄列 */
+.hero-row{display:flex;align-items:center;gap:10px;padding:4px 2px}
+.hero{position:relative;display:flex;align-items:center;gap:9px;background:linear-gradient(150deg,#2c2650,#1a1732);
+  border:1px solid var(--line);border-radius:12px;padding:6px 12px;cursor:pointer;transition:.12s;min-width:0}
+.hero:hover{border-color:#8f7fd8}
+.hero.tgt{box-shadow:0 0 0 3px #ff6b7f;animation:pulse 1s infinite}
+.hero .av{width:38px;height:38px;border-radius:50%;display:grid;place-items:center;
+  font-weight:800;font-size:15px;color:#1a1226;flex:none}
+.hero .hname{font-size:12.5px;font-weight:700;white-space:nowrap}
+.hero .hhp{font-size:19px;font-weight:800;color:#ff8e9e}
+.hero .hhp small{font-size:11px;color:var(--dim);font-weight:400}
+.sp{display:flex;gap:3px;flex-wrap:wrap;max-width:150px}
+.sp i{width:11px;height:11px;border-radius:50%;background:#2b2648;border:1px solid #4a4278}
+.sp i.on{background:radial-gradient(circle at 35% 30%,#9fd0ff,#2f6bd0);border-color:#a8d4ff;
+  box-shadow:0 0 6px rgba(90,150,255,.7)}
+.sp i.used{background:#241f3e}
+.spnum{font-size:12px;color:var(--blue);font-weight:700}
+.hpow{border-radius:12px;padding:6px 10px;font-size:11.5px;line-height:1.25;max-width:170px;text-align:left}
+.deckinfo{font-size:11px;color:var(--dim);text-align:center;line-height:1.3}
+
+/* 中間欄 */
+.midbar{display:flex;align-items:center;gap:12px;padding:4px 0;
+  border-top:1px solid rgba(255,255,255,.06);border-bottom:1px solid rgba(255,255,255,.06)}
+.turn-info{flex:1;font-size:12.5px;color:var(--dim);letter-spacing:.05em}
+.turn-info b{color:var(--gold)}
+.btn.endturn{background:linear-gradient(160deg,#c9a03c,#8a6a1c);border-color:#e8c86a;color:#1c1526;font-weight:700}
+.btn.endturn:disabled{background:var(--panel2);color:var(--dim);font-weight:400}
+
+/* 手牌 */
+.hand{display:flex;justify-content:center;align-items:flex-end;gap:6px;padding:8px 4px 4px;
+  min-height:150px;overflow-x:auto;overflow-y:visible}
+.hand .card{width:106px;flex:none;min-height:134px}
+.hand .card.playable{border-color:#e8c86a;box-shadow:0 0 14px rgba(232,200,106,.25)}
+.hand .card.sel{transform:translateY(-14px);box-shadow:0 0 0 3px var(--gold),0 10px 24px rgba(0,0,0,.6)}
+
+/* 記錄 */
+.logbox{width:230px;flex:none;background:rgba(0,0,0,.28);border-left:1px solid var(--line);
+  overflow:auto;padding:8px;font-size:11.5px;color:#bdb4dc;line-height:1.5}
+.logbox .t{color:#6f6796}
+@media(max-width:900px){.logbox{display:none}.editor{grid-template-columns:1fr}}
+
+.hint{position:fixed;bottom:12px;left:50%;transform:translateX(-50%);background:rgba(20,16,36,.95);
+  border:1px solid var(--gold);border-radius:20px;padding:7px 18px;font-size:13px;z-index:50}
+
+/* 覆蓋層 */
+.overlay{position:fixed;inset:0;background:rgba(8,6,16,.82);display:grid;place-items:center;z-index:100;
+  backdrop-filter:blur(4px);padding:20px;overflow:auto}
+.overlay-inner{background:var(--panel);border:1px solid var(--line);border-radius:16px;
+  padding:24px;max-width:760px;width:100%;text-align:center}
+.overlay-inner h2{margin:0 0 6px}
+.mull-cards{display:flex;gap:10px;justify-content:center;flex-wrap:wrap;margin:18px 0}
+.mull-cards .card{width:112px}
+.mull-cards .card.toss{opacity:.4;transform:scale(.92);border-color:#a3455c}
+
+.tooltip{position:fixed;z-index:200;max-width:250px;background:rgba(18,15,32,.98);
+  border:1px solid var(--line);border-radius:10px;padding:9px 11px;font-size:12px;pointer-events:none;
+  box-shadow:0 8px 24px rgba(0,0,0,.6)}
+.tooltip b{color:var(--gold)}
+
+.rules h3{color:var(--gold);margin:20px 0 6px;font-size:15px}
+.rules p,.rules li{color:#cdc5e6;font-size:13.5px}
+.rules table{border-collapse:collapse;width:100%;margin:8px 0}
+.rules td,.rules th{border:1px solid var(--line);padding:5px 8px;font-size:13px;text-align:left}
+.rules th{background:var(--panel);color:var(--gold)}
+.statbox{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px}
+.statbox div{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:12px}
+.statbox b{display:block;font-size:24px;color:var(--gold)}
+
+/* ---------- 關鍵字 TAG ---------- */
+.kw{font-style:normal;color:var(--green);border-bottom:1px dotted rgba(143,214,168,.6);font-weight:700}
+.tooltip .kwdefs{margin-top:7px;padding-top:6px;border-top:1px solid var(--line);
+  font-size:11px;color:#b6ade0;line-height:1.5}
+.tooltip .kwdefs b{color:var(--green)}
+.perm .kw{border-bottom:none}
+
+/* ---------- BGM ---------- */
+.card.t-bgm{border-top:3px solid #d9a441}
+.bgmbox{display:flex;align-items:center;gap:8px;padding:4px 10px;border-radius:20px;
+  border:1px solid var(--line);background:rgba(0,0,0,.25);font-size:11px;max-width:290px;
+  flex:none;overflow:hidden;white-space:nowrap}
+.bgmbox b{display:block;font-size:11.5px;overflow:hidden;text-overflow:ellipsis;max-width:190px}
+.bgmbox small{color:var(--dim);font-size:10px}
+.bgmbox .note{font-size:15px;color:#d9a441}
+.bgmbox.empty{color:#5b5482;border-style:dashed}
+.bgmbox.mine{border-color:#d9a441;box-shadow:0 0 12px rgba(217,164,65,.2)}
+.bgmbox.foe{border-color:#a3455c}
+.bgmbox .lock{color:#ff9db0;font-size:10px}
+
+.bgmslot{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:7px 10px;
+  background:rgba(0,0,0,.18);border-radius:var(--r);border:1px solid var(--line);font-size:12px}
+.bgmslot .bl{color:#d9a441;font-weight:700;flex:none}
+.bgmslot .chip{background:#3a3360;border:1px solid #d9a441;border-radius:12px;padding:2px 10px;
+  color:#f0dda8;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.bgmslot .none{color:#6b6390}
+
+/* 森羅結界：層數越多光圈越亮 */
+.unit.barrier{box-shadow:inset 0 0 0 2px rgba(232,200,106,.75),0 0 14px rgba(232,200,106,.35)}
+.unit.barrier .ubadge{color:#e8c86a;border-color:#e8c86a}
+
+/* 多作登場的角色：能吃到多種作品結界，標成金色 */
+.card .tp.multi{color:#d9a441;font-weight:700}
+.card .tp.base{color:#6b6390}
+
+/* 合奏啟動中 */
+.unit.ensemble{box-shadow:inset 0 0 0 2px rgba(185,167,224,.8),0 0 14px rgba(185,167,224,.4)}
+.unit.ensemble .ubadge{color:#b9a7e0;border-color:#b9a7e0}
+
+/* ---------- 分頁 ---------- */
+.tabs{display:flex;gap:6px;flex-wrap:wrap;margin:10px 0}
+.tab{background:var(--panel);border:1px solid var(--line);color:var(--dim);
+  padding:6px 14px;border-radius:18px;cursor:pointer;font-size:12.5px;transition:.12s}
+.tab:hover{background:var(--panel2);color:var(--txt)}
+.tab.on{background:linear-gradient(160deg,#b0405c,#7a2a48);border-color:#d4657f;color:#fff;font-weight:700}
+
+/* ---------- 英雄選擇卡片牆 ---------- */
+.hero-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px;padding-bottom:24px}
+.hero-card{background:var(--panel);border:1px solid var(--line);border-left:4px solid var(--line);
+  border-radius:var(--r);padding:12px 14px;cursor:pointer;transition:.12s;
+  display:flex;flex-direction:column;gap:7px}
+.hero-card:hover{background:var(--panel2);transform:translateY(-2px);border-color:#7d6fc0}
+.hero-card.sel{box-shadow:0 0 0 2px var(--gold)}
+.hc-top{display:flex;align-items:center;gap:10px}
+.hc-top b{display:block;font-size:15px}
+.hc-top small{color:var(--dim);font-size:11px}
+.hc-hp{margin-left:auto;font-size:20px;font-weight:800;color:#ff8e9e}
+.hc-build{color:var(--gold);font-size:12.5px;font-weight:700}
+.hc-power{background:rgba(0,0,0,.22);border-radius:8px;padding:7px 9px;font-size:11.5px;line-height:1.5}
+.hc-power b{display:block;color:var(--blue)}
+.hc-cards{color:#6b6390;font-size:11px}
+#hero-search{max-width:220px}
+
+/* ---------- 編輯器的英雄橫幅 ---------- */
+.hero-banner{display:flex;align-items:center;gap:10px;padding:8px 12px;
+  background:var(--panel);border:1px solid var(--line);border-left:4px solid var(--line);
+  border-radius:var(--r)}
+.hero-banner .hb-info{flex:1;min-width:0}
+.hero-banner .hb-info b{display:block;font-size:14px}
+.hero-banner .hb-info small{color:var(--dim);font-size:11px;line-height:1.4;display:block}
+
+/* ---------- 卡池篩選 ---------- */
+.filters{display:flex;flex-direction:column;gap:6px;background:rgba(0,0,0,.16);
+  border:1px solid var(--line);border-radius:var(--r);padding:8px 10px}
+.frow{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.flabel{color:var(--dim);font-size:11.5px;width:34px;flex:none}
+.chips{display:flex;gap:4px;flex-wrap:wrap}
+.chip{background:var(--panel);border:1px solid var(--line);color:var(--dim);
+  padding:3px 10px;border-radius:12px;cursor:pointer;font-size:11.5px;transition:.1s}
+.chip:hover{background:var(--panel2);color:var(--txt)}
+.chip.on{background:linear-gradient(160deg,#5a86d8,#2c4a8c);border-color:#8fb0e8;color:#fff;font-weight:700}
+.chip.cost{min-width:28px;text-align:center;padding:3px 6px}
+.chip.cost.on{background:linear-gradient(160deg,#5a86d8,#2c4a8c)}
+.fcount{margin-left:auto;color:#6b6390;font-size:11.5px}
+#f-text{flex:1;min-width:120px}
+.deck-card .dk-bgm{color:#d9a441;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:block}
+.deck-card .dk-bgm.none{color:#6b6390}
+.hc-cards.none{color:#a3455c}
+
+/* 專屬卡：左側英雄色條 */
+.card.own{border-left:3px solid var(--line)}
+.dl-row.own{border-left:3px solid var(--line);padding-left:5px}

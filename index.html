@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>東方符卡大戰</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+<!-- ========== 主選單 ========== -->
+<section id="screen-menu" class="screen active">
+  <div class="menu-wrap">
+    <h1 class="logo">東方<span>符卡</span>大戰</h1>
+    <p class="sub">Touhou Spell Card War — 規則驗證原型 v0.1</p>
+    <div class="menu-btns">
+      <button class="btn big" id="btn-resume" hidden>繼續對局</button>
+      <button class="btn big primary" id="btn-play">開始對戰</button>
+      <button class="btn big" id="btn-decks">牌組編輯</button>
+      <button class="btn big" id="btn-stats">戰績</button>
+      <button class="btn big" id="btn-rules">規則說明</button>
+    </div>
+    <p class="foot">單機 AI 對戰 ・ 存檔於瀏覽器 localStorage</p>
+  </div>
+</section>
+
+<!-- ========== 牌組選擇 ========== -->
+<section id="screen-select" class="screen">
+  <header class="bar"><button class="btn back" data-goto="menu">← 返回</button><h2>選擇牌組</h2><span></span></header>
+  <div class="pad">
+    <h3 class="sect">預設牌組</h3>
+    <div class="tabs" id="select-tabs"></div>
+    <div id="select-presets" class="deck-grid"></div>
+    <h3 class="sect">我的牌組</h3>
+    <div id="select-decks" class="deck-grid"></div>
+    <h3 class="sect">對手</h3>
+    <div class="row-inline">
+      <label>AI 英雄
+        <select id="ai-hero"><option value="random">隨機</option></select>
+      </label>
+      <label>難度
+        <select id="ai-level">
+          <option value="easy">簡單</option>
+          <option value="hard">困難</option>
+        </select>
+      </label>
+      <label>先後手
+        <select id="first-choice">
+          <option value="random">隨機</option>
+          <option value="me">我先手</option>
+          <option value="ai">我後手</option>
+        </select>
+      </label>
+    </div>
+    <button class="btn big primary" id="btn-start">對戰開始</button>
+  </div>
+</section>
+
+<!-- ========== 牌組編輯 ========== -->
+<section id="screen-deck" class="screen">
+  <header class="bar"><button class="btn back" data-goto="menu">← 返回</button><h2>牌組編輯</h2>
+    <button class="btn" id="btn-new-deck">＋ 新牌組</button></header>
+  <div id="deck-list-view" class="pad">
+    <h3 class="sect">我的牌組</h3>
+    <div id="deck-list" class="deck-grid"></div>
+    <p id="deck-empty" class="hintline" hidden>還沒有自己的牌組。可以按上方「＋ 新牌組」從零開始，或從下面的預設牌組複製一份來改。</p>
+    <div class="row-inline">
+      <input id="import-code" placeholder="貼上牌組碼以匯入">
+      <button class="btn" id="btn-import">匯入</button>
+    </div>
+    <h3 class="sect">預設牌組（唯讀）</h3>
+    <p class="hintline">預設牌組不能修改或刪除，對戰時可以直接選用。想改的話按「複製一份」。</p>
+    <div class="tabs" id="preset-tabs"></div>
+    <div id="preset-list" class="deck-grid"></div>
+  </div>
+  <div id="deck-edit-view" class="editor" hidden>
+    <div class="editor-left">
+      <div class="row-inline">
+        <button class="btn back" id="btn-deck-back">← 牌組列表</button>
+        <input id="deck-name" placeholder="牌組名稱">
+      </div>
+      <div class="hero-banner" id="deck-hero-banner"></div>
+      <div class="filters">
+        <div class="frow">
+          <input id="f-text" placeholder="搜尋名稱或效果">
+          <button class="btn small" id="f-more">更多篩選 ▾</button>
+          <button class="btn small" id="f-clear">清除</button>
+          <span id="f-count" class="fcount"></span>
+        </div>
+        <div class="frow"><span class="flabel">費用</span><div class="chips" id="f-cost"></div></div>
+        <div class="frow"><span class="flabel">種類</span><div class="chips" id="f-type"></div></div>
+        <div class="frow"><span class="flabel">歸屬</span><div class="chips" id="f-owner"></div></div>
+        <div id="f-adv" hidden>
+          <div class="frow"><span class="flabel">族群</span><div class="chips" id="f-tribe"></div></div>
+          <div class="frow"><span class="flabel">收錄</span><div class="chips" id="f-works"></div></div>
+        </div>
+      </div>
+      <div id="pool" class="pool"></div>
+    </div>
+    <div class="editor-right">
+      <div class="row-inline">
+        <span id="deck-count" class="count">0 / 40</span>
+      </div>
+      <div id="bgm-slot" class="bgmslot"></div>
+      <div id="curve" class="curve"></div>
+      <div id="decklist" class="decklist"></div>
+      <div class="row-inline">
+        <button class="btn" id="btn-autofill">自動補滿</button>
+        <button class="btn" id="btn-export">複製牌組碼</button>
+        <button class="btn danger" id="btn-del-deck">刪除</button>
+      </div>
+      <div id="deck-errs" class="errs"></div>
+    </div>
+  </div>
+</section>
+
+<!-- ========== 英雄選擇 ========== -->
+<section id="screen-hero" class="screen">
+  <header class="bar">
+    <button class="btn back" id="btn-hero-back">← 返回</button>
+    <h2 id="hero-title">選擇英雄</h2>
+    <input id="hero-search" placeholder="搜尋英雄或技能">
+  </header>
+  <div class="pad">
+    <div class="tabs" id="hero-tabs"></div>
+    <div id="hero-grid" class="hero-grid"></div>
+    <p id="hero-empty" class="hintline" hidden>沒有符合的英雄。</p>
+  </div>
+</section>
+
+<!-- ========== 戰績 ========== -->
+<section id="screen-stats" class="screen">
+  <header class="bar"><button class="btn back" data-goto="menu">← 返回</button><h2>戰績</h2><span></span></header>
+  <div class="pad" id="stats-body"></div>
+</section>
+
+<!-- ========== 規則 ========== -->
+<section id="screen-rules" class="screen">
+  <header class="bar"><button class="btn back" data-goto="menu">← 返回</button><h2>規則說明</h2><span></span></header>
+  <div class="pad rules" id="rules-body"></div>
+</section>
+
+<!-- ========== 對戰 ========== -->
+<section id="screen-game" class="screen game">
+  <div class="board">
+    <div class="side foe">
+      <div class="hero-row" id="foe-hero-row"></div>
+      <div class="lane wards" id="foe-wards"></div>
+      <div class="lane units" id="foe-units"></div>
+    </div>
+    <div class="midbar">
+      <div class="bgmbox" id="bgm-box"></div>
+      <div class="turn-info" id="turn-info"></div>
+      <button class="btn endturn" id="btn-end">結束回合</button>
+      <button class="btn small" id="btn-quit">投降</button>
+    </div>
+    <div class="side me">
+      <div class="lane units" id="me-units"></div>
+      <div class="lane wards" id="me-wards"></div>
+      <div class="hero-row" id="me-hero-row"></div>
+    </div>
+    <div class="hand" id="me-hand"></div>
+  </div>
+  <aside class="logbox"><div id="log"></div></aside>
+  <div class="hint" id="hint" hidden></div>
+</section>
+
+<!-- ========== 覆蓋層 ========== -->
+<div id="overlay" class="overlay" hidden><div class="overlay-inner" id="overlay-inner"></div></div>
+<div id="tooltip" class="tooltip" hidden></div>
+
+<!-- 載入順序：引擎 → 卡表基礎 → 英雄 → 各彈卡片 → 牌組 → AI → 存檔 → 介面 -->
+<script src="js/config.js"></script>
+<script src="js/engine.js"></script>
+<script src="js/carddb.js"></script>
+<script src="js/keywords.js"></script>
+<script src="js/heroes.js"></script>
+<script src="js/cards/common.js"></script>
+<script src="js/cards/eosd.js"></script>
+<script src="js/cards/pcb.js"></script>
+<script src="js/cards/in.js"></script>
+<script src="js/decks.js"></script>
+<script src="js/ai.js"></script>
+<script src="js/storage.js"></script>
+<script src="js/ui.js"></script>
+<script src="js/main.js"></script>
+</body>
+</html>

@@ -1,0 +1,21 @@
+{
+  "name": "touhou-spellcard-war",
+  "version": "0.1.0",
+  "description": "東方符卡大戰 — 規則驗證原型",
+  "private": true,
+  "scripts": {
+    "test": "node tools/lint-heroes.js && node tools/lint-cards.js && node tools/lint-decks.js && node tools/rules.js && node tools/ai-scenarios.js && node tools/selftest.js 2 --max 500 && node tools/uitest.js && node tools/chrometest.js",
+    "lint": "node tools/lint-heroes.js && node tools/lint-cards.js && node tools/lint-decks.js",
+    "balance": "node tools/selftest.js 4",
+    "ui": "node tools/uitest.js",
+    "browser": "node tools/chrometest.js",
+    "cards": "node tools/dump-cards.js",
+    "ai": "node tools/ai-scenarios.js",
+    "duel": "node tools/ai-duel.js 2",
+    "rules": "node tools/rules.js"
+  },
+  "devDependencies": {
+    "jsdom": "^24.0.0",
+    "puppeteer-core": "^24.0.0"
+  }
+}
