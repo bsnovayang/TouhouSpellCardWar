@@ -1,0 +1,11 @@
+# 這些是開發用的，不屬於網站
+node_modules
+server
+tools
+docs
+package.json
+package-lock.json
+wrangler.jsonc
+.assetsignore
+.gitignore
+README.md

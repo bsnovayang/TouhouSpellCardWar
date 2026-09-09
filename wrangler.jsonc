@@ -1,0 +1,18 @@
+/* 靜態網站的部署設定。
+
+   遊戲伺服器（Durable Object）的設定在 server/wrangler.toml，是另一個
+   Worker（名為 tsw）—— 這兩件事刻意分開部署：伺服器改版時不該連帶
+   重推整個前端，反之亦然。
+
+   這裡用 Workers Static Assets 而不是 Pages：兩者對純靜態站台效果相同，
+   但 Cloudflare 的儀表板現在把 Git 連結導向 Workers，而且這樣以後若要把
+   網頁和伺服器併成同一個 Worker，只需要加一個 [durable_objects] 綁定。 */
+{
+  "name": "touhouspellcardwar",
+  "compatibility_date": "2026-01-01",
+  "assets": {
+    // 遊戲是純 HTML+JS，沒有建置步驟，整個 repo 根目錄就是網站根目錄。
+    // 不該上線的東西列在 .assetsignore。
+    "directory": "."
+  }
+}
