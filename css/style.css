@@ -409,3 +409,9 @@ input{min-width:160px}
   .dlbtn{width:40px;height:40px;font-size:18px}
   .dl-row{padding:7px 8px}
 }
+
+
+/* 回合倒數 */
+.clock{color:var(--blue);font-weight:700}
+.clock.urgent{color:#ff6b7f;animation:clockpulse .8s infinite}
+@keyframes clockpulse{0%,100%{opacity:1}50%{opacity:.45}}

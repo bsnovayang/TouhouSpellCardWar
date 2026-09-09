@@ -171,6 +171,7 @@ function startBattle(deck, aiHeroId, firstChoice, aiLevel) {
   G.humanSide = 0;
   sel = null; busy = false;
   resetHpTracking();
+  timerAttach();
   showScreen('game');
   showMulligan();
 }
@@ -457,7 +458,10 @@ function renderMid() {
   var t = $('turn-info');
   var who = G.active === ME ? '你的回合' : '對手回合';
   var p = G.players[G.active];
-  t.innerHTML = '第 <b>' + G.turn + '</b> 回合 ・ <b>' + who + '</b>' +
+  var left = timerSecondsLeft();
+  var clock = (left == null) ? '' :
+    ' ・ <span class="clock' + (left <= 10 ? ' urgent' : '') + '">⏱ ' + left + 's</span>';
+  t.innerHTML = '第 <b>' + G.turn + '</b> 回合 ・ <b>' + who + '</b>' + clock +
     (G.players[ME].goSen.length ? ' ・ <span style="color:#8fd6a8">後之先 ' + G.players[ME].goSen.join('/') + '</span>' : '');
   $('btn-end').disabled = (G.active !== ME || busy || G.winner != null);
 }
@@ -593,6 +597,7 @@ function doPlay(uid, t) {
 
 function afterAction() {
   sel = null;
+  if (NET.mode === 'local') timerSync(G);
   renderGame();
   // 連線對戰不存本地檔 —— 那份是過期副本，重連時必須以權威端的盤面為準，
   // 存了反而會讓玩家重整後「回到過去」，兩邊對不上。
@@ -1276,6 +1281,7 @@ function refreshMenu() {
    注意 G 會被整包取代 —— 客人端從不自己修改盤面，
    所以不會有「本地改了一半又被覆蓋」的閃爍問題。 */
 function netAttach() {
+  timerAttach();
   NET.onState = function (s) {
     if (!s) return;
     G = s;
@@ -1296,4 +1302,18 @@ function netAttach() {
 function netStatus(msg) {
   var n = $('net-status');
   if (n) n.textContent = msg || '';
+}
+
+
+/* 倒數只更新中間欄那一行，不重繪整個盤面 —— 每 250ms 重畫全場會很浪費。 */
+function timerAttach() {
+  NET.onTick = function () { if (G && $('turn-info')) renderMid(); };
+  NET.onTimeout = function () {
+    // 單機：時間到就替玩家結束回合，走跟按鈕一樣的路徑
+    if (!guard()) return;
+    toast('時間到');
+    onEndTurn();
+  };
+  timerSync(NET.mode === 'host' ? HOST.full : G);
+  timerStart();
 }

@@ -31,7 +31,8 @@ const URL = 'http://localhost:8899/index.html';
   };
 
   const A = await mk('主機'), B = await mk('客人');
-  const step = m => console.log('  … ' + m);
+  const step = m => console.log('  … ' + m);
+  const nlx = String.fromCharCode(10);
   // 背景分頁的 compositor 會被 Chrome 節流，page.click 需要它做 scrollIntoView。
   // 這是測試環境的限制，不是遊戲的問題。
   const click = async (p, sel) => { await p.bringToFront(); await p.click(sel); };
@@ -102,8 +103,46 @@ step('客人加入');
   const after = await other.evaluate(() => G.active);
   console.log('  另一邊的 active：' + before + ' → ' + after + (before !== after ? '　✓ 有同步' : '　✗ 沒同步'));
 
-    /* 斷言 —— 沒有這一段的話這支測試只會印字，不會擋下任何回歸 */
+    /* --- 回合計時：權威端會強制結束，且兩邊同步 --- */
+  console.log(nlx + '=== 回合計時 ===');
+  // 改短時限之後要讓權威端重新同步一次 deadline ——
+  // timerSync 只在「動作發生」或「廣播」時被呼叫，不會自己輪詢設定值。
+  await A.evaluate(() => {
+    TURN_SECONDS = 3;
+    TIMER.key = '';
+    timerSync(HOST.full);
+    hostBroadcast();
+  });
+  await wait(300);
+  const clockBefore = await B.evaluate(() => ({ a: G.active, left: timerSecondsLeft() }));
+  console.log('  客人看到的倒數：' + clockBefore.left + 's');
+  await wait(4500);
+  const clockAfter = await Promise.all([
+    A.evaluate(() => G.active), B.evaluate(() => G.active)
+  ]);
+  console.log('  4.5 秒後 active：主機 ' + clockAfter[0] + '　客人 ' + clockAfter[1]);
+
+  /* --- 斷線：關掉客人的分頁，主機應該倒數後判定獲勝 --- */
+  console.log(nlx + '=== 斷線處理 ===');
+  await A.evaluate(() => { DISCONNECT_GRACE = 6; });
+  await B.close();
+  await wait(3500);
+  const dc1 = await A.evaluate(() => ({
+    s: document.getElementById('net-status').textContent, lost: ALIVE.lost, w: G ? G.winner : null }));
+  console.log('  3.5 秒：「' + dc1.s + '」lost=' + dc1.lost);
+  await wait(5000);
+  const dc2 = await A.evaluate(() => ({
+    s: document.getElementById('net-status').textContent, w: G ? G.winner : null }));
+  console.log('  8.5 秒：「' + dc2.s + '」winner=' + dc2.w);
+
+  /* 斷言 —— 沒有這一段的話這支測試只會印字，不會擋下任何回歸 */
   const fail = [];
+  if (!dc1.lost) fail.push('對手分頁關掉了，卻沒有偵測到斷線');
+  if (dc1.w !== null) fail.push('斷線當下就判定勝負了 —— 應該給寬限期');
+  if (dc2.w !== 0) fail.push('寬限期過了卻沒有判定主機獲勝');
+  if (clockBefore.left == null) fail.push('客人看不到回合倒數');
+  if (clockAfter[0] === clockBefore.a) fail.push('時間到了但權威端沒有強制結束回合');
+  if (clockAfter[0] !== clockAfter[1]) fail.push('強制結束回合後兩邊不同步');
   if (soloHost.hasG) fail.push('客人還沒加入，主機就已經有對局了');
   if (soloHost.overlay) fail.push('客人還沒加入，主機就跳出調度介面了');
   if (a2.heroes && a2.heroes[0] === a2.heroes[1]) fail.push('雙方英雄一樣 —— 客人的牌組沒有被採用');

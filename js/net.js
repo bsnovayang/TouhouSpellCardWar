@@ -25,7 +25,9 @@ var NET = {
   transport: null,   // { send(msg), close() }
   matchId: null,
   onState: null,     // 收到新盤面時要做什麼（由 ui.js 掛上）
-  onInfo: null       // 連線狀態變化（等待對手／對手斷線／對手離開）
+  onInfo: null,      // 連線狀態變化（等待對手／對手斷線／對手離開）
+  onTick: null,      // 每 250ms 回報剩餘秒數
+  onTimeout: null    // 單機模式時間到（由 ui 決定怎麼結束回合）
 };
 
 /* ---------- 遮蔽視野 ----------
@@ -84,12 +86,19 @@ function dispatch(a) {
 var HOST = { full: null, myDeck: null };
 
 function hostBroadcast() {
-  NET.transport.send({ t: 'state', side: 1 - NET.side, s: redact(HOST.full, 1 - NET.side) });
+  timerSync(HOST.full);
+  NET.transport.send({
+    t: 'state', side: 1 - NET.side,
+    s: redact(HOST.full, 1 - NET.side),
+    deadline: TIMER.deadline
+  });
   if (NET.onState) NET.onState(redact(HOST.full, NET.side));
 }
 
 /* 主機收到客人的訊息 */
 function hostOnMessage(msg) {
+  aliveSeen();
+  if (msg.t === 'ping') return;
   if (msg.t === 'join') {
     // 對局在這一刻才被建立 —— 在知道對手帶什麼牌組之前不能開始。
     if (HOST.full) { NET.transport.send({ t: 'full', m: '房間已經有人了' }); return; }
@@ -129,6 +138,8 @@ function hostStart(guestDeck) {
 
 /* 客人收到主機的訊息 */
 function guestOnMessage(msg) {
+  aliveSeen();
+  if (msg.t === 'ping') return;
   if (msg.t === 'full' || msg.t === 'reject') {
     if (NET.onInfo) NET.onInfo('reject', msg.m);
     return;
@@ -140,6 +151,9 @@ function guestOnMessage(msg) {
   if (msg.t === 'state' && msg.side === NET.side) {
     G = msg.s;
     G.humanSide = NET.side;
+    // 倒數由權威端決定，客人只是顯示。兩邊時鐘可能有幾百毫秒的差，
+    // 但只有權威端會真的結束回合，所以不會有「我這邊還有 1 秒卻被結束」的爭議。
+    TIMER.deadline = msg.deadline || 0;
     if (NET.onState) NET.onState(G);
   } else if (msg.t === 'err') {
     if (NET.onInfo) NET.onInfo('err', msg.m);
@@ -176,6 +190,7 @@ function netHost(room, myDeck) {
   HOST.myDeck = myDeck;
   G = null;
   NET.transport = localChannel(room, hostOnMessage);
+  aliveStart();
 }
 
 /* 客人：帶著自己的牌組連上房間 */
@@ -185,9 +200,12 @@ function netJoin(room, myDeck) {
   NET.matchId = room;
   NET.transport = localChannel(room, guestOnMessage);
   NET.transport.send({ t: 'join', deck: myDeck });
+  aliveStart();
 }
 
 function netLeave() {
+  timerStop();
+  aliveStop();
   if (NET.transport) {
     try { NET.transport.send({ t: 'bye' }); } catch (e) { }
     NET.transport.close();
@@ -195,4 +213,133 @@ function netLeave() {
   NET.transport = null;
   NET.mode = 'local';
   NET.matchId = null;
+}
+
+
+/* ============================================================
+   回合計時
+
+   為什麼不放進引擎：引擎必須是確定性的（rules 測試、平衡跑、重播都靠這個），
+   一旦讀牆上時鐘就不可重現了。所以引擎只認得「結束回合」這個動作，
+   何時送出它是這一層的判斷。
+
+   權威端負責強制結束；非權威端只顯示倒數（deadline 跟著盤面一起推過來）。
+   ============================================================ */
+
+var TIMER = { deadline: 0, iv: null, key: '' };
+
+/* 權威盤面：單機與主機是自己那份，客人沒有 */
+function authState() {
+  if (NET.mode === 'host') return HOST.full;
+  if (NET.mode === 'local') return G;
+  return null;
+}
+
+/* 回合換人時重設倒數。用 turn+active+phase 當識別，
+   因為同一個回合內做很多動作不該讓時間重來。 */
+function timerSync(s) {
+  if (!s) return;
+  var k = s.turn + ':' + s.active + ':' + s.phase;
+  if (k === TIMER.key) return;
+  TIMER.key = k;
+  TIMER.deadline = (s.phase === 'play' && s.winner == null)
+    ? Date.now() + TURN_SECONDS * 1000 : 0;
+}
+
+function timerSecondsLeft() {
+  if (!TIMER.deadline) return null;
+  return Math.max(0, Math.ceil((TIMER.deadline - Date.now()) / 1000));
+}
+
+function timerTick() {
+  var left = timerSecondsLeft();
+  if (NET.onTick) NET.onTick(left);
+  if (left !== 0) return;
+
+  var s = authState();
+  if (!s || s.phase !== 'play' || s.winner != null) return;
+  // 單機時只逼自己的回合 —— AI 本來就瞬間完成，不需要被計時
+  if (NET.mode === 'local' && s.active !== ME) return;
+
+  TIMER.deadline = 0;
+  logMsg(s, '時間到 — 自動結束回合');
+  if (NET.mode === 'local') {
+    if (NET.onTimeout) NET.onTimeout();
+  } else {
+    applyAction(s, s.active, { k: 'end' });
+    hostBroadcast();
+  }
+}
+
+function timerStart() {
+  if (TIMER.iv) clearInterval(TIMER.iv);
+  TIMER.iv = setInterval(timerTick, 250);
+}
+
+function timerStop() {
+  if (TIMER.iv) clearInterval(TIMER.iv);
+  TIMER.iv = null;
+  TIMER.deadline = 0;
+  TIMER.key = '';
+}
+
+
+/* ============================================================
+   斷線偵測
+
+   用心跳而不是通道的關閉事件，理由有兩個：
+     · BroadcastChannel 在分頁被關掉時不會通知另一端
+     · 心跳也涵蓋「連著但沒回應」（當機、睡眠、網路黑洞）
+   換成 WebSocket 之後這一套完全不用改。
+
+   對手斷線時不立刻判輸 —— 伺服器分不出「重新整理」和「不玩了」，
+   給 DISCONNECT_GRACE 秒的寬限，回來就繼續。
+   ============================================================ */
+
+var ALIVE = { lastSeen: 0, iv: null, lost: false };
+
+function aliveStart() {
+  aliveStop();
+  ALIVE.lastSeen = Date.now();
+  ALIVE.lost = false;
+  ALIVE.iv = setInterval(aliveTick, 1000);
+}
+
+function aliveStop() {
+  if (ALIVE.iv) clearInterval(ALIVE.iv);
+  ALIVE.iv = null;
+  ALIVE.lost = false;
+}
+
+function aliveSeen() {
+  var wasLost = ALIVE.lost;
+  ALIVE.lastSeen = Date.now();
+  ALIVE.lost = false;
+  if (wasLost && NET.onInfo) NET.onInfo('back', '對手回來了');
+}
+
+function aliveTick() {
+  if (NET.mode === 'local' || !NET.transport) return;
+  NET.transport.send({ t: 'ping' });
+
+  var gone = (Date.now() - ALIVE.lastSeen) / 1000;
+  if (gone < 3) return;                       // 還在正常心跳範圍
+
+  var left = Math.max(0, Math.ceil(DISCONNECT_GRACE - gone));
+  if (!ALIVE.lost) {
+    ALIVE.lost = true;
+    if (NET.onInfo) NET.onInfo('lost', '對手斷線中…');
+  }
+  if (NET.onInfo) NET.onInfo('waiting', '對手斷線中…（' + left + ' 秒後判定）');
+
+  if (left > 0) return;
+
+  // 寬限期用完：權威端判定對手離開，客人只能顯示狀態並停止
+  aliveStop();
+  var s = authState();
+  if (s && s.winner == null) {
+    applyAction(s, 1 - NET.side, { k: 'concede' });
+    hostBroadcast();
+  }
+  if (NET.onInfo) NET.onInfo('left', '對手已離開，判定你獲勝');
 }
