@@ -65,6 +65,23 @@
     netStatus('房間 ' + room + '：連線中…');
   };
 
+  /* 線上配對 */
+  $('btn-match').onclick = function () {
+    if (!SERVER_URL) { alert('尚未設定伺服器位址（js/net.js 的 SERVER_URL）'); return; }
+    var d = findDeck(chosenDeckId) || presetDecks()[0];
+    var errs = validateDeck(d);
+    if (errs.length) { alert('牌組不合法：' + errs.join(', ')); return; }
+    netAttach();
+    showScreen('game');
+    netStatus('配對中…');
+    netMatchmake(d, function (room) {
+      netStatus('配對中…（房間 ' + room + '，等待對手）');
+    }).catch(function (e) {
+      netStatus('配對失敗：' + e.message);
+      toast('配對失敗，請確認伺服器位址');
+    });
+  };
+
   /* 對戰操作 */
   $('btn-end').onclick = onEndTurn;
   $('btn-quit').onclick = function () {

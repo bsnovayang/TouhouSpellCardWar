@@ -122,6 +122,12 @@ step('客人加入');
   ]);
   console.log('  4.5 秒後 active：主機 ' + clockAfter[0] + '　客人 ' + clockAfter[1]);
 
+  /* --- 對局進行中不得留下本地存檔 --- */
+  /* 連線時本地那份是遮蔽過的過期副本。留著的話重整會被當成單機續戰，
+     AI 就接手了對手 —— 玩家會看到「對手突然變成 NPC」。 */
+  const savedDuring = await A.evaluate(() => !!localStorage.getItem('tsw_game_v1'));
+  console.log('  對局中本地存檔：' + (savedDuring ? '有（不該有）' : '無 ✓'));
+
   /* --- 斷線：關掉客人的分頁，主機應該倒數後判定獲勝 --- */
   console.log(nlx + '=== 斷線處理 ===');
   await A.evaluate(() => { DISCONNECT_GRACE = 6; });
@@ -135,8 +141,22 @@ step('客人加入');
     s: document.getElementById('net-status').textContent, w: G ? G.winner : null }));
   console.log('  8.5 秒：「' + dc2.s + '」winner=' + dc2.w);
 
+  /* --- 重整後不得變成單機續戰 --- */
+  console.log(nlx + '=== 重整 ===');
+  await A.reload({ waitUntil: 'domcontentloaded' });
+  await wait(700);
+  const afterReload = await A.evaluate(() => ({
+    screen: document.querySelector('.screen.active').id,
+    mode: NET.mode,
+    hasG: !!(typeof G !== 'undefined' && G)
+  }));
+  console.log('  重整後：畫面=' + afterReload.screen + '　NET.mode=' + afterReload.mode +
+    '　有對局=' + afterReload.hasG);
+
   /* 斷言 —— 沒有這一段的話這支測試只會印字，不會擋下任何回歸 */
   const fail = [];
+  if (savedDuring) fail.push('連線對局中留下了本地存檔 —— 重整會被當成單機續戰');
+  if (afterReload.hasG) fail.push('重整後仍載入了對局 —— 對手會變成 AI');
   if (!dc1.lost) fail.push('對手分頁關掉了，卻沒有偵測到斷線');
   if (dc1.w !== null) fail.push('斷線當下就判定勝負了 —— 應該給寬限期');
   if (dc2.w !== 0) fail.push('寬限期過了卻沒有判定主機獲勝');

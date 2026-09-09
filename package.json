@@ -13,7 +13,8 @@
     "ai": "node tools/ai-scenarios.js",
     "duel": "node tools/ai-duel.js 2",
     "rules": "node tools/rules.js",
-    "pvp": "node tools/pvptest.js"
+    "pvp": "node tools/pvptest.js",
+    "build:server": "node tools/build-server.js"
   },
   "devDependencies": {
     "jsdom": "^24.0.0",

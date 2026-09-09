@@ -1,0 +1,19 @@
+name = "tsw"
+main = "src/index.js"
+compatibility_date = "2026-01-01"
+
+# 一個 class 就夠 —— 配對佇列用固定 id 'lobby'，
+# 每場對局用 'match:<房間碼>'。免費方案限制的是每帳號 100 個 class，
+# instance 數量不限。
+[[durable_objects.bindings]]
+name = "MATCH"
+class_name = "Match"
+
+# 免費方案只支援 SQLite backend，所以一定要用 new_sqlite_classes
+# （寫成 new_classes 會在部署時被拒絕）。
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["Match"]
+
+[observability]
+enabled = true

@@ -212,7 +212,7 @@ function showMulligan() {
       }
       ov.hidden = true;
       renderGame();
-      if (NET.mode === 'local') saveGame(G);
+      persist();
       if (NET.mode === 'local' && G.active === AI) setTimeout(aiStep, 600);
       // 連線：另一邊還沒調度完的話，畫面會停在等待狀態，
       // 由權威端推來的新盤面觸發重繪
@@ -240,7 +240,7 @@ function renderChoice() {
       if (err) { toast(err); return; }
       ov.hidden = true;
       renderGame();
-      saveGame(G);
+      persist();
     };
     wrap.appendChild(e);
   });
@@ -537,6 +537,14 @@ function isLegalSelTarget(t) {
   });
 }
 
+/* 存檔的單一出口。
+   連線對戰時本地那份是遮蔽過的過期副本 —— 存了之後重整會被當成單機續戰，
+   AI 就接手了對手，玩家會看到「對手變成 NPC」。
+   先前有三個 saveGame 呼叫點漏掉守衛，所以集中成一個函式。 */
+function persist() {
+  if (NET.mode === 'local') saveGame(G); else clearGame();
+}
+
 /* ---------- 玩家操作 ---------- */
 function guard() { return G && G.winner == null && G.active === ME && !busy && G.phase === 'play'; }
 
@@ -601,7 +609,7 @@ function afterAction() {
   renderGame();
   // 連線對戰不存本地檔 —— 那份是過期副本，重連時必須以權威端的盤面為準，
   // 存了反而會讓玩家重整後「回到過去」，兩邊對不上。
-  if (NET.mode === 'local') saveGame(G);
+  persist();
   if (G.winner != null) showResult();
 }
 
@@ -616,7 +624,7 @@ function onEndTurn() {
   var err = dispatch({ k: 'end' });
   if (err) { toast(err); return; }
   renderGame();
-  saveGame(G);
+  persist();
   if (G.winner != null) { showResult(); return; }
   // 只有單機才叫 AI。連線對戰時對面是真人，而且本地的 G 是遮蔽過的視野 ——
   // AI 在上面跑會讀到 '?' 的手牌直接爆掉。
@@ -639,7 +647,7 @@ function aiStep() {
     endTurn(G);
     busy = false;
     renderGame();
-    saveGame(G);
+    persist();
     if (G.winner != null) showResult();
     else if (G.active === AI) { busy = true; setTimeout(aiStep, SET.aiDelay); }
     return;

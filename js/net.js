@@ -177,6 +177,61 @@ function localChannel(room, onMessage) {
   };
 }
 
+/* ---------- 傳輸：WebSocket（跨裝置） ----------
+   跟 localChannel 的介面完全一樣，所以上面所有邏輯都不用改。
+
+   跨裝置時伺服器才是權威端，兩邊都是 guest —— 沒有人在瀏覽器裡跑引擎，
+   所以對手的手牌真的離不開伺服器。同裝置的 BroadcastChannel 模式
+   則是主機端跑引擎，那個只用來在沒有後端時驗證流程。 */
+var SERVER_URL = '';   // 例如 'wss://tsw.你的帳號.workers.dev'，空字串代表沒有設定伺服器
+
+function wsChannel(room, onMessage, onOpen) {
+  var ws = new WebSocket(SERVER_URL + '/ws/' + room);
+  var queue = [];
+  ws.onopen = function () {
+    queue.forEach(function (m) { ws.send(JSON.stringify(m)); });
+    queue = [];
+    if (onOpen) onOpen();
+  };
+  ws.onmessage = function (e) {
+    var m; try { m = JSON.parse(e.data); } catch (x) { return; }
+    onMessage(m);
+  };
+  ws.onclose = function () { if (NET.onInfo) NET.onInfo('lost', '與伺服器的連線中斷'); };
+  return {
+    send: function (m) {
+      // 連線還沒建立就先排隊，否則第一個 join 訊息會掉
+      if (ws.readyState === 1) ws.send(JSON.stringify(m)); else queue.push(m);
+    },
+    close: function () { try { ws.close(); } catch (e) { } }
+  };
+}
+
+/* 伺服器模式：兩邊都是客戶端，權威在 DO 那一側 */
+function netConnect(room, myDeck, side) {
+  NET.mode = 'guest';
+  NET.side = side;
+  NET.matchId = room;
+  HOST.full = null;
+  G = null;
+  NET.transport = wsChannel(room, guestOnMessage, function () {
+    NET.transport.send({ t: 'join', deck: myDeck });
+  });
+  aliveStart();
+}
+
+/* 自動配對：先問伺服器要一個房間，再連上去 */
+function netMatchmake(myDeck, onWaiting) {
+  var http = SERVER_URL.replace(/^ws/, 'http');
+  return fetch(http + '/matchmake', { method: 'POST' })
+    .then(function (r) { return r.json(); })
+    .then(function (j) {
+      if (j.waiting && onWaiting) onWaiting(j.room);
+      netConnect(j.room, myDeck, j.side);
+      return j;
+    });
+}
+
 /* ---------- 對外：開一場雙人對局 ---------- */
 
 /* 主機：開房等待。**這裡不建立對局** ——

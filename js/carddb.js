@@ -155,3 +155,32 @@ function hasTribe(d, t) { return tribesOf(d).indexOf(t) >= 0; }
 function countTribe(s, pi, t) {
   return unitsOf(s, pi).filter(function (u) { return hasTribe(def(u.defId), t); }).length;
 }
+
+/* 牌組合法性檢查。放在這裡而不是 storage.js —— 它是規則不是存檔功能，
+   而且伺服器必須用它驗證客戶端送來的牌組（storage.js 依賴 localStorage，
+   沒辦法在 Worker 裡跑）。 */
+/* ---------- 牌組合法性 ---------- */
+function validateDeck(deck) {
+  var errs = [];
+  if (deck.cards.length !== DECK_SIZE) errs.push('牌組必須剛好 ' + DECK_SIZE + ' 張（目前 ' + deck.cards.length + '）');
+  var cnt = {};
+  deck.cards.forEach(function (c) { cnt[c] = (cnt[c] || 0) + 1; });
+  Object.keys(cnt).forEach(function (c) {
+    var d = CARDS[c];
+    if (!d) { errs.push('未知的卡片：' + c); return; }
+    var cap = d.unique ? 1 : MAX_COPIES;
+    if (cnt[c] > cap) {
+      errs.push('「' + d.name + '」' + (d.unique ? '是專屬卡，只能放 1 張' : '超過 ' + MAX_COPIES + ' 張'));
+    }
+    if (d.cls !== 'neutral' && d.cls !== deck.heroId) errs.push('「' + d.name + '」不屬於此英雄');
+    if (d.token) errs.push('「' + d.name + '」無法放入牌組');
+    if (d.type === 'bgm') errs.push('BGM 卡要放在 BGM 欄，不能放進主牌組');
+  });
+  // BGM 欄
+  if (deck.bgm) {
+    var bd = CARDS[deck.bgm];
+    if (!bd || bd.type !== 'bgm') errs.push('BGM 欄放了不是 BGM 的卡');
+    else if (bd.cls !== 'neutral' && bd.cls !== deck.heroId) errs.push('「' + bd.name + '」不屬於此英雄');
+  }
+  return errs;
+}
